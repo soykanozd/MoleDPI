@@ -58,7 +58,7 @@ If the ordinary DNS path fails for supported recovery domains, MoleDPI can use Q
 
 - **Experimental software. Bugs and outages are possible.**
 - Apple Silicon binaries only. Minimum target macOS 13; runtime verification has been limited to a recent macOS release. Older macOS versions, Intel Macs and a clean-Mac install are not certified.
-- TCP 80/443 only. **No system-wide UDP or QUIC bypass. Voice calls, screen sharing and game sessions are not guaranteed.**
+- DPI processing covers TCP 80/443. **Application UDP/QUIC traffic continues through your normal network; MoleDPI does not currently modify it.** Voice calls, screen sharing and games can work when their network paths are reachable. This is different from bypassing a UDP block. See [UDP behavior and test scope](docs/UDP.md).
 - Your public IP remains visible. This is not an anonymity service.
 - Supplemental recovery queries use a local UDP/TCP bridge and certificate-verified DNS-over-HTTPS to Quad9. Quad9 can see those queries. Ordinary system DNS queries outside recovery remain governed by your system settings. HTTPS certificate validation stays enabled.
 - Checks contact fixed public HTTPS control destinations listed in the source (`Model.swift`). These are test endpoints, not application-specific support promises. No browsing history, traffic-content logging or analytics SDK is included.
@@ -101,7 +101,7 @@ Wake and path events invalidate results from earlier network checks. The control
 
 **Is MoleDPI a VPN?** No. It tries local TCP/TLS techniques; it does not route your traffic through a remote VPN server or hide your public IP.
 
-**Will every website and app work?** No. Results depend on the network and filtering method. Connected means the engine and selected HTTPS checks passed, not universal access. UDP and QUIC bypass are not supported.
+**Will every website and app work?** No. Results depend on the network and filtering method. Connected means the engine and selected HTTPS checks passed, not universal access. Application UDP/QUIC traffic is left on the normal network; it may work without additional processing. UDP blocking is not currently bypassed.
 
 **Why does macOS show an unidentified-developer warning?** Public builds currently use an ad-hoc signature and have no Apple notarization. Read the installation warning above and only approve software you trust.
 
