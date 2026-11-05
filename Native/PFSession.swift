@@ -41,10 +41,10 @@ func rules(_ uid: UInt32) -> String {
 func secureRootDirectory(_ path: String) throws {
     var st = stat()
     if lstat(path, &st) != 0 {
-        guard mkdir(path, 0o755) == 0 else { throw Failure(message: "Güvenli çalışma dizini oluşturulamadı.") }
-        guard lstat(path, &st) == 0 else { throw Failure(message: "Çalışma dizini okunamadı.") }
+        guard mkdir(path, 0o755) == 0 else { throw Failure(message: "Could not create a secure working directory.") }
+        guard lstat(path, &st) == 0 else { throw Failure(message: "Could not inspect the working directory.") }
     }
-    guard st.st_uid == 0, st.st_mode & S_IFMT == S_IFDIR, st.st_mode & 0o022 == 0 else { throw Failure(message: "Güvenilmeyen ayrıcalıklı dizin reddedildi.") }
+    guard st.st_uid == 0, st.st_mode & S_IFMT == S_IFDIR, st.st_mode & 0o022 == 0 else { throw Failure(message: "Untrusted privileged directory rejected.") }
 }
 final class SignalFlag: @unchecked Sendable {
     let lock = NSLock(); private var value = false
@@ -68,13 +68,13 @@ final class SignalFlag: @unchecked Sendable {
             var st = stat()
             guard lstat(url.path, &st) == 0, st.st_uid == 0, st.st_mode & S_IFMT == S_IFREG, st.st_mode & 0o022 == 0, st.st_size < 32768,
                   let journal = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
-                  (journal["uid"] as? NSNumber)?.uint32Value == uid else { throw Failure(message: "Güvenilir PF kurtarma kaydı bulunamadı.") }
+                  (journal["uid"] as? NSNumber)?.uint32Value == uid else { throw Failure(message: "Trusted PF recovery record not found.") }
             let emptied = try command(pfctl, ["-a", anchor(uid), "-f", "-"], input: "")
-            guard emptied.code == 0 else { throw Failure(message: "MoleDPI PF kuralları temizlenemedi.") }
+            guard emptied.code == 0 else { throw Failure(message: "Could not clear MoleDPI PF rules.") }
             if let token = journal["pfToken"] as? String {
-                guard !token.isEmpty, token.count <= 32, token.utf8.allSatisfy({ (48...57).contains($0) }) else { throw Failure(message: "Geçersiz PF referansı.") }
+                guard !token.isEmpty, token.count <= 32, token.utf8.allSatisfy({ (48...57).contains($0) }) else { throw Failure(message: "Invalid PF reference.") }
                 let released = try command(pfctl, ["-X", token])
-                guard released.code == 0 else { throw Failure(message: "MoleDPI PF referansı bırakılamadı; kılavuzdan denetle.") }
+                guard released.code == 0 else { throw Failure(message: "Could not release the MoleDPI PF reference.") }
             }
             let done: [String: Any] = ["phase": "stopped", "message": "", "uid": uid, "checkedAt": Date().timeIntervalSince1970]
             try JSONSerialization.data(withJSONObject: done).write(to: url, options: .atomic)
@@ -85,13 +85,13 @@ final class SignalFlag: @unchecked Sendable {
               let uid = UInt32(CommandLine.arguments[1]), uid >= 500,
               let parent = Int32(CommandLine.arguments[2]), parent > 1,
               let uuid = UUID(uuidString: CommandLine.arguments[3]),
-              let profile = Int(CommandLine.arguments[5]), (0...5).contains(profile) else { throw Failure(message: "Geçersiz oturum isteği.") }
+              let profile = Int(CommandLine.arguments[5]), (0...5).contains(profile) else { throw Failure(message: "Invalid session request.") }
         let heartbeat = CommandLine.arguments[4]
         // Last argument is a version marker, not executable/configuration input.
-        guard CommandLine.arguments[6] == "v1" else { throw Failure(message: "Oturum sürümü uyuşmuyor.") }
+        guard CommandLine.arguments[6] == "v1" else { throw Failure(message: "Session protocol version mismatch.") }
         let tokenString = uuid.uuidString
         let owner = try command("/bin/ps", ["-o", "uid=", "-p", String(parent)])
-        guard owner.code == 0, UInt32(owner.text.trimmingCharacters(in: .whitespacesAndNewlines)) == uid else { throw Failure(message: "İstek sahibi doğrulanamadı.") }
+        guard owner.code == 0, UInt32(owner.text.trimmingCharacters(in: .whitespacesAndNewlines)) == uid else { throw Failure(message: "Could not verify the request owner.") }
         func alive() -> Bool {
             var st = stat()
             guard kill(parent, 0) == 0 else { return false }
@@ -169,13 +169,13 @@ final class SignalFlag: @unchecked Sendable {
             let nat = try command(pfctl, ["-sn"])
             guard filter.code == 0, nat.code == 0,
                   filter.text.contains("anchor \"com.apple/*\""), nat.text.contains("rdr-anchor \"com.apple/*\"") else {
-                throw Failure(message: "PF ana bağlantı noktaları etkin değil. Genel güvenlik duvarı kuralları değiştirilmedi.")
+                throw Failure(message: "Required PF anchors are unavailable.")
             }
             let existing = try command(pfctl, ["-a", name, "-sr"])
             let existingNAT = try command(pfctl, ["-a", name, "-sn"])
-            guard !existing.text.contains("route-to"), !existingNAT.text.contains("rdr pass") else { throw Failure(message: "Başka bir MoleDPI PF oturumu var.") }
+            guard !existing.text.contains("route-to"), !existingNAT.text.contains("rdr pass") else { throw Failure(message: "Another MoleDPI PF session exists.") }
             let syntax = try command(pfctl, ["-n", "-a", name, "-f", "-"], input: rules(uid))
-            guard syntax.code == 0 else { throw Failure(message: "PF kuralları bu macOS sürümünde doğrulanamadı: \(syntax.text)") }
+            guard syntax.code == 0 else { throw Failure(message: "PF rules failed validation: \(syntax.text)") }
             let profiles = [["--split-pos=host+1", "--tlsrec=host+1"], ["--split-pos=2", "--oob=tls"], ["--split-pos=host+1", "--tlsrec=host+1"]]
             engine.executableURL = URL(fileURLWithPath: privilegedDirectory + "/tpws")
             engine.arguments = ["--user=root", "--bind-addr=127.0.0.1", "--bind-iface6=lo0", "--bind-linklocal=force", "--port=18082", "--maxconn=128", "--filter-tcp=80,443", "--filter-l7=http,tls"] + profiles[profile % 3]
@@ -193,15 +193,15 @@ final class SignalFlag: @unchecked Sendable {
             guard engine.isRunning, alive(), !signals.stopped else { throw Failure(message: "The network session was cancelled.") }
             mark("listen")
             let enabled = try command(pfctl, ["-E"])
-            guard enabled.code == 0, let range = enabled.text.range(of: #"Token\s*:\s*([0-9]+)"#, options: .regularExpression) else { throw Failure(message: "PF etkinleştirme referansı alınamadı.") }
+            guard enabled.code == 0, let range = enabled.text.range(of: #"Token\s*:\s*([0-9]+)"#, options: .regularExpression) else { throw Failure(message: "Could not acquire a PF activation reference.") }
             pfToken = String(enabled.text[range]).split(separator: ":").last!.trimmingCharacters(in: .whitespacesAndNewlines)
             status("starting", token: pfToken)
             // Mark before loading: a failed pfctl call might have partially applied.
             loaded = true
             let applied = try command(pfctl, ["-a", name, "-f", "-"], input: rules(uid))
-            guard applied.code == 0 else { throw Failure(message: "PF oturum kuralları uygulanamadı.") }
+            guard applied.code == 0 else { throw Failure(message: "Could not apply PF session rules.") }
             let check = try command(pfctl, ["-a", name, "-sr"])
-            guard check.code == 0, check.text.contains("route-to"), engine.isRunning else { throw Failure(message: "PF / tpws durumu doğrulanamadı.") }
+            guard check.code == 0, check.text.contains("route-to"), engine.isRunning else { throw Failure(message: "Could not verify PF and tpws state.") }
             if profile >= 3 {
                 guard ListenerReadiness.ownsTCPListener(pid: parent, port: 18083) else {
                     throw Failure(message: "Encrypted DNS listener is not owned by the client.")
@@ -225,7 +225,7 @@ final class SignalFlag: @unchecked Sendable {
                     let info = try command(pfctl, ["-s", "info"])
                     let own = try command(pfctl, ["-a", name, "-vvsr"])
                     guard info.code == 0, info.text.contains("Status: Enabled"), own.code == 0, own.text.contains("route-to") else {
-                        throw Failure(message: "PF kuralları artık etkin değil.")
+                        throw Failure(message: "PF rules are no longer active.")
                     }
                     let regex = try NSRegularExpression(pattern: #"Packets:\s*([0-9]+)"#)
                     packetCount = regex.matches(in: own.text, range: NSRange(own.text.startIndex..., in: own.text)).reduce(0) { total, match in
@@ -237,8 +237,8 @@ final class SignalFlag: @unchecked Sendable {
                 iteration += 1; Thread.sleep(forTimeInterval: needsInitialCount ? 0.12 : 0.5)
             }
             let engineFailed = !engine.isRunning
-            if clean() { status(engineFailed ? "failed" : "stopped", engineFailed ? "tpws beklenmedik biçimde kapandı." : "") }
-            else { status("cleanup_failed", "PF temizlenemedi. Ağ onarımı gerekli.", token: pfToken) }
+            if clean() { status(engineFailed ? "failed" : "stopped", engineFailed ? "The network engine stopped unexpectedly." : "") }
+            else { status("cleanup_failed", "PF cleanup failed. Recovery is required.", token: pfToken) }
         } catch {
             let ok = clean()
             status(ok ? "failed" : "cleanup_failed", error.localizedDescription, token: ok ? nil : pfToken)

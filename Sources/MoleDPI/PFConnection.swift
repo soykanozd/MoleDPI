@@ -64,7 +64,7 @@ actor PFConnection: ConnectionEngine {
             let path = URL(fileURLWithPath: directory).appendingPathComponent(name)
             if FileManager.default.isExecutableFile(atPath: path.path) { return path }
         }
-        throw RoutingError.message("Yerel ağ motoru bulunamadı. Kaynak projedeki build.sh ile yeniden derle.")
+        throw RoutingError.message("The bundled network engine is missing. Reinstall MoleDPI.")
     }
     static func checks(_ targets: [SiteCheck], transport: Probe.Transport, addresses: [String:String] = [:]) async -> [SiteCheck] {
         await withTaskGroup(of: SiteCheck.self) { group in
@@ -143,14 +143,14 @@ actor PFConnection: ConnectionEngine {
                     }
                     launch.mark("helper.pf-ready"); activeProfile = profile; return
                 }
-                if phase == "failed" || phase == "cleanup_failed" { throw RoutingError.message(status["message"] as? String ?? "PF motoru açılamadı.") }
+                if phase == "failed" || phase == "cleanup_failed" { throw RoutingError.message(status["message"] as? String ?? "Could not start the PF session.") }
             }
             try await Task.sleep(nanoseconds: 25_000_000)
         }
-        throw RoutingError.message("Mac ağ izni beklenirken süre doldu.")
+        throw RoutingError.message("Network session startup timed out.")
     }
     func start(targets: [SiteCheck]) async throws -> [SiteCheck] {
-        guard !targets.isEmpty else { throw RoutingError.message("Bağlantı kontrol listesi boş.") }
+        guard !targets.isEmpty else { throw RoutingError.message("No connectivity targets are configured.") }
         let clock = ConnectClock()
         let id = UUID(); generation = id
         do {
@@ -194,7 +194,7 @@ actor PFConnection: ConnectionEngine {
                     try await Task.sleep(nanoseconds: 10_000_000)
                 }
                 try valid(id)
-                guard process.isRunning else { stopPreflight(); throw RoutingError.message("tpws başlatılamadı; 18081 portu kullanımda olabilir.") }
+                guard process.isRunning else { stopPreflight(); throw RoutingError.message("Could not start the probe. Port 18081 may be busy.") }
                 clock.mark("engine.probe-readiness-gate")
                 var results = await Self.checks(targets, transport: .socks, addresses: alternate)
                 if alternate.isEmpty, orderIndex == 0, results.contains(where: { $0.reachable != true }) {
@@ -219,7 +219,7 @@ actor PFConnection: ConnectionEngine {
                 guard preflight == nil else { throw RoutingError.message("Network probe did not stop.") }
                 if running && results.allSatisfy({ $0.reachable == true }) { selected = profile + (alternate.isEmpty ? 0 : 3); break }
             }
-            guard let profile = selected else { throw RoutingError.message("tpws yöntemleri web erişimini doğrulayamadı. Ağ ayarları değiştirilmedi.") }
+            guard let profile = selected else { throw RoutingError.message("The available strategies could not verify secure web access.") }
             try valid(id)
             clock.mark("engine.preflight-done")
             let baseline = await directChecks // Direct measurements must finish before installing PF rules.
@@ -245,7 +245,7 @@ actor PFConnection: ConnectionEngine {
                 try valid(id); try await Task.sleep(nanoseconds: 150_000_000)
             }
             guard (readStatus()?["packets"] as? NSNumber)?.uint64Value ?? 0 > 0, results.allSatisfy({ $0.reachable == true }), readStatus()?["phase"] as? String == "active", service != nil else {
-                throw RoutingError.message("PF üzerinden HTTPS erişimi doğrulanamadı; bağlantı geri alınıyor.")
+                throw RoutingError.message("Could not verify HTTPS through PF. Restoring the session.")
             }
             UserDefaults.standard.set(profile % 3, forKey: "MoleDPI.verifiedStrategy.v1")
             clock.mark("engine.counter-verified")
@@ -270,7 +270,7 @@ actor PFConnection: ConnectionEngine {
         return results
     }
     private func repair() async throws {
-        guard let session = statusURL?.deletingLastPathComponent().lastPathComponent, UUID(uuidString: session) != nil else { throw RoutingError.message("PF kurtarma oturumu bulunamadı.") }
+        guard let session = statusURL?.deletingLastPathComponent().lastPathComponent, UUID(uuidString: session) != nil else { throw RoutingError.message("The PF recovery session was not found.") }
         guard let service else { throw RoutingError.message("Network helper is unavailable for recovery.") }
         try await ServiceClient.request(service, session: session, profile: nil)
         guard readStatus()?["phase"] as? String == "stopped" else { throw RoutingError.message("Network recovery was not verified.") }

@@ -39,19 +39,19 @@ actor SystemRouting: Routing {
                 }
             }
             guard status == errAuthorizationSuccess, let auth else {
-                throw RoutingError.message("Mac ağ izni verilmedi. Bağlantı açılmadı.")
+                throw RoutingError.message("Network permission was not approved.")
             }
             authorization = auth
         }
         guard let prefs = SCPreferencesCreateWithAuthorization(nil, "MoleDPI" as CFString, nil, authorization) else {
-            throw RoutingError.message("Mac ağ ayarları açılamadı.")
+            throw RoutingError.message("Could not open network settings.")
         }
         return prefs
     }
     private func proxyProtocol(_ prefs: SCPreferences, serviceID: String) throws -> SCNetworkProtocol {
         guard let service = SCNetworkServiceCopy(prefs, serviceID as CFString),
               let proto = SCNetworkServiceCopyProtocol(service, kSCNetworkProtocolTypeProxies) else {
-            throw RoutingError.message("Etkin ağın HTTPS proxy ayarı bulunamadı.")
+            throw RoutingError.message("Could not find HTTPS proxy settings.")
         }
         return proto
     }
@@ -68,15 +68,15 @@ actor SystemRouting: Routing {
     func enable() throws {
         // A crash/relaunch can leave settings behind. Restore journal before reusing.
         if FileManager.default.fileExists(atPath: Self.journalURL.path) { try restore() }
-        guard let serviceID = Self.primaryID() else { throw RoutingError.message("Etkin Wi-Fi veya Ethernet bağlantısı bulunamadı.") }
+        guard let serviceID = Self.primaryID() else { throw RoutingError.message("No active Wi-Fi or Ethernet connection.") }
         let prefs = try preferences()
-        guard SCPreferencesLock(prefs, true) else { throw RoutingError.message("Ağ ayarları başka bir işlem tarafından kullanılıyor.") }
+        guard SCPreferencesLock(prefs, true) else { throw RoutingError.message("Network settings are busy.") }
         defer { SCPreferencesUnlock(prefs) }
         let proto = try proxyProtocol(prefs, serviceID: serviceID)
         var config = SCNetworkProtocolGetConfiguration(proto) as? [String: Any] ?? [:]
         for key in ["HTTPSEnable", "ProxyAutoConfigEnable", "ProxyAutoDiscoveryEnable", "HTTPSRequiresPassword"] {
             if (config[key] as? NSNumber)?.intValue == 1 {
-                throw RoutingError.message("Mevcut proxy / otomatik proxy ayarın var. Üzerine yazılmadı.")
+                throw RoutingError.message("Existing proxy settings must be preserved.")
             }
         }
         var saved: [String: Any] = [:]
@@ -88,7 +88,7 @@ actor SystemRouting: Routing {
         config["HTTPSEnable"] = 1; config["HTTPSProxy"] = "127.0.0.1"; config["HTTPSPort"] = 18080
         guard SCNetworkProtocolSetConfiguration(proto, config as CFDictionary), SCPreferencesCommitChanges(prefs), SCPreferencesApplyChanges(prefs) else {
             // Keep recovery journal: commit may have succeeded even if apply failed.
-            throw RoutingError.message("HTTPS proxy uygulanamadı. Ağ ayarını onarmak için Yeniden Dene'yi kullan.")
+            throw RoutingError.message("Could not apply HTTPS proxy settings. Retry cleanup.")
         }
     }
     func restore() throws {
@@ -96,16 +96,16 @@ actor SystemRouting: Routing {
         let data = try Data(contentsOf: Self.journalURL)
         guard let journal = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
               let serviceID = journal["serviceID"] as? String,
-              let saved = journal["saved"] as? [String: Any] else { throw RoutingError.message("Ağ kurtarma kaydı okunamadı. HTTPS proxy ayarını elle denetle.") }
+              let saved = journal["saved"] as? [String: Any] else { throw RoutingError.message("Could not read the proxy recovery record.") }
         let prefs = try preferences()
-        guard SCPreferencesLock(prefs, false) else { throw RoutingError.message("Ağ ayarları kilitli; yeniden dene.") }
+        guard SCPreferencesLock(prefs, false) else { throw RoutingError.message("Network settings are locked. Retry cleanup.") }
         defer { SCPreferencesUnlock(prefs) }
         let proto = try proxyProtocol(prefs, serviceID: serviceID)
         let config = SCNetworkProtocolGetConfiguration(proto) as? [String: Any] ?? [:]
         if Self.owns(config) {
             let old = Self.restored(current: config, saved: saved)
             guard SCNetworkProtocolSetConfiguration(proto, old as CFDictionary), SCPreferencesCommitChanges(prefs), SCPreferencesApplyChanges(prefs) else {
-                throw RoutingError.message("HTTPS proxy geri alınamadı. Ağ → Proxy'ler bölümünden kapatabilirsin.")
+                throw RoutingError.message("Could not restore HTTPS proxy settings.")
             }
         } else {
             // Someone changed these settings. Never overwrite their new configuration.

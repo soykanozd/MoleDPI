@@ -8,7 +8,7 @@ A free, open-source macOS menu-bar application for trying local DPI circumventio
 
 **Apple Silicon · macOS 13 or later**
 
-1. Download **[MoleDPI.dmg](../../releases/download/v0.9.3-beta/MoleDPI.dmg)** from Releases. For this experimental pre-release, use **[all releases](../../releases)**.
+1. Download **[MoleDPI.dmg](../../releases/download/v1.0.0/MoleDPI.dmg)** from Releases. For other releases, use **[all releases](../../releases)**.
 2. Open the disk image and drag **MoleDPI** onto **Applications**.
 3. Open MoleDPI from Applications.
 4. Click the helmet in the menu bar, then **Connect**.
@@ -46,7 +46,7 @@ If the ordinary DNS path fails for Discord or Roblox, MoleDPI can use Quad9 DNS-
 - Checks contact example.com, discord.com and www.roblox.com. No browsing history, traffic-content logging or analytics SDK is included.
 - VPNs, firewalls, sleep/wake and network changes may affect reliability. Long-duration stability has not been certified.
 - Network processing uses root-owned software. Independent security review is still needed.
-- Some technical error messages remain untranslated.
+- Application-controlled error messages are in English; macOS-generated dialogs follow the system language.
 
 ## Remove
 

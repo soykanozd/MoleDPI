@@ -22,10 +22,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>local.moledpi.app</string>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
 <key>CFBundleIconFile</key><string>MoleDPI.icns</string>
-<key>CFBundleVersion</key><string>93</string>
+<key>CFBundleVersion</key><string>100</string>
 <key>CFBundleName</key><string>MoleDPI</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.9.3</string>
+<key>CFBundleShortVersionString</key><string>1.0.0</string>
+<key>MoleReleaseTag</key><string>v1.0.0</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>

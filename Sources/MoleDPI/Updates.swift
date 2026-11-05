@@ -48,7 +48,9 @@ struct ReleaseVersion: Comparable, Equatable {
                       let releases = try JSONSerialization.jsonObject(with:data) as? [[String:Any]] else {
                     throw URLError(.badServerResponse)
                 }
-                let current = ReleaseVersion((Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "0.9.3")+"-beta")!
+                let tag = Bundle.main.object(forInfoDictionaryKey:"MoleReleaseTag") as? String ??
+                    ((Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "0.9.3")+"-beta")
+                guard let current = ReleaseVersion(tag) else { throw URLError(.cannotParseResponse) }
                 let candidates = releases.compactMap { entry -> (ReleaseVersion,URL)? in
                     guard entry["draft"] as? Bool == false, let tag = entry["tag_name"] as? String,
                           let version = ReleaseVersion(tag), let raw = entry["html_url"] as? String,
