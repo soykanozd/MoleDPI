@@ -1,0 +1,10 @@
+MoleDPI — source-built macOS application
+Own Swift sources and scripts: SPDX-License-Identifier: GPL-3.0-only
+See LICENSE. Provided without warranty.
+
+Bundled third-party source: bol-van/zapret tpws (MIT), pinned at
+73ee2aa04e6e94922e7dc07554a1c3a456dc3201, with one marked MoleDPI adaptation.
+Its license and dependency notices are preserved in vendor/zapret.
+See THIRD-PARTY.md and RESEARCH.md for provenance, licenses and limitations.
+FreeDPI, GoodbyeDPI, ByeDPI Android, SpoofDPI-Turkiye and darkware were
+researched; their engines/binaries/UI code are not additionally bundled.
