@@ -1,0 +1,27 @@
+name: Compatibility report / Uyumluluk testi
+description: Share tested behavior and clearly identify what remains untested.
+title: "[Compatibility]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Report only what you actually tested. Do not include IPs, network names, account details or browsing history."
+  - type: input
+    id: versions
+    attributes:
+      label: MoleDPI version, macOS version and processor family
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Results and reproduction steps
+      description: Separate HTTPS access, reconnect, physical sleep/wake, Wi-Fi changes, install and cleanup. Mark anything else untested. UDP/QUIC bypass is not supported.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before posting
+      options:
+        - label: I removed personal information and separated real tests from simulated events.
+          required: true

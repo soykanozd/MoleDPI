@@ -1,0 +1,40 @@
+name: Bug report / Hata bildirimi
+description: Report a reproducible problem without personal network data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "MoleDPI is experimental. Do not post passwords, tokens, IP addresses, network names, browsing history or unredacted screenshots. / Kişisel ağ bilgilerini paylaşmayın."
+  - type: input
+    id: version
+    attributes:
+      label: MoleDPI version
+      placeholder: v1.0.1
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: macOS version and processor family
+      placeholder: macOS version, Apple Silicon or Intel; no serial numbers
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps, expected result and actual result
+      description: Explain how to reproduce it. Use general network descriptions; omit private details.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Optional reviewed diagnostics
+      description: Use ? → Review Diagnostics. Inspect and redact before sharing; no raw logs.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before posting
+      options:
+        - label: I reviewed this report and removed private information.
+          required: true

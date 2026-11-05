@@ -1,14 +1,32 @@
-# MoleDPI
+# MoleDPI — macOS DPI bypass
+
+**Free, open-source local censorship circumvention for Apple Silicon.**
+
+[Download for Mac](https://github.com/soykanozd/MoleDPI/releases/latest/download/MoleDPI.dmg) · [Latest release](https://github.com/soykanozd/MoleDPI/releases/latest) · [Türkçe kurulum](README-TR.md) · [Build from source](BUILDING.md)
 
 **EXPERIMENTAL — bugs, connection failures and network interruptions may occur.**
 
 A free, open-source macOS menu-bar application for trying local DPI circumvention with source-built zapret **tpws**. No remote VPN server or account is required.
 
+<p align="center">
+  <img src="docs/images/moledpi-panel.png" width="330" alt="MoleDPI menu-bar panel, showing the mole illustration, Not Connected status and Connect button">
+</p>
+
+*Interface preview rendered from the application. No live connection is shown.*
+
+## At a glance
+
+- Native SwiftUI menu-bar interface with Connect, Disconnect and safe Quit.
+- Source-built zapret tpws engine; local TCP/TLS splitting with macOS Packet Filter.
+- No VPN server, account, subscription or developer-operated relay.
+- HTTPS verification, controlled reconnection and connection-help guidance.
+- General-purpose TCP 80/443 processing. UDP/QUIC bypass and anonymity are not provided.
+
 ## Download and install
 
 **Apple Silicon · macOS 13 or later**
 
-1. Download **[MoleDPI.dmg](../../releases/download/v1.0.1/MoleDPI.dmg)** from Releases. For other releases, use **[all releases](../../releases)**.
+1. Download **[MoleDPI.dmg](https://github.com/soykanozd/MoleDPI/releases/latest/download/MoleDPI.dmg)** from Releases. For other releases, use **[all releases](https://github.com/soykanozd/MoleDPI/releases)**.
 2. Open the disk image and drag **MoleDPI** onto **Applications**.
 3. Open MoleDPI from Applications.
 4. Click the helmet in the menu bar, then **Connect**.
@@ -72,9 +90,25 @@ The app uses public DNS infrastructure and your existing internet connection. It
 
 ## Report a bug
 
-Use [Issues](../../issues). Include the app version, macOS version, action and error. Do not include passwords, tokens, browsing history, personal network details or unredacted screenshots.
+Use [Issues](https://github.com/soykanozd/MoleDPI/issues). Include the app version, macOS version, action and error. Do not include passwords, tokens, browsing history, personal network details or unredacted screenshots.
 
 ### Connection help and network recovery
 **? → Connection Help** explains the last observed failure category and safe next steps. DNS lookup, TLS, timeout, remote HTTP response and local engine failures are distinguished when there is evidence. An access failure alone cannot prove censorship. Diagnostics include the category only, never raw command output or destinations.
 
 Wake and path events invalidate results from earlier network checks. The controller retains its consecutive-failure count across refreshes, preserves a working engine and pauses checks/new attempts during system sleep. Manual Disconnect and Quit still prevent reconnection. Physical sleep/wake and Wi-Fi roaming require testing on your own network; deterministic tests do not certify every network.
+
+## Frequently asked questions
+
+**Is MoleDPI a VPN?** No. It tries local TCP/TLS techniques; it does not route your traffic through a remote VPN server or hide your public IP.
+
+**Will every website and app work?** No. Results depend on the network and filtering method. Connected means the engine and selected HTTPS checks passed, not universal access. UDP and QUIC bypass are not supported.
+
+**Why does macOS show an unidentified-developer warning?** Public builds currently use an ad-hoc signature and have no Apple notarization. Read the installation warning above and only approve software you trust.
+
+**How do I update?** Open **? → Check for Updates**. When a newer version is found, **View Release** opens its GitHub release page. Disconnect and Quit before replacing the application in Applications.
+
+## Help improve MoleDPI
+
+Reproducible bug reports, sanitized compatibility results, documentation improvements and code review are welcome. See [Contributing](CONTRIBUTING.md) and [open an issue](https://github.com/soykanozd/MoleDPI/issues/new/choose). Keep personal details and browsing history out of public reports.
+
+If MoleDPI is useful to you, a GitHub star or sharing the repository link can help others discover it. Please keep the experimental status and support limitations alongside any recommendation.
