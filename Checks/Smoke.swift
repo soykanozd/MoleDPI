@@ -83,6 +83,12 @@ actor RecoverOnRetry: ConnectionEngine {
         let stops = await recoveringEngine.stops
         try expect(starts == 0 && stops == 2, "quit admission lock, single cleanup and retry")
         print("PASS: repeated quit shares cleanup; connect blocked; failed shutdown can be retried")
+        let privateModel = Model()
+        privateModel.detail = "/private/fixture/private-person token=secret 192.0.2.8"
+        privateModel.reviewDiagnostics()
+        try expect(privateModel.diagnostics?.contains("private-person") == false &&
+                   privateModel.diagnostics?.contains("secret") == false &&
+                   privateModel.diagnostics?.contains("192.0.2.8") == false, "diagnostics exclude raw errors and identifiers")
         let a = Proxy(); let b = Proxy()
         try await a.start()
         try expect(ListenerReadiness.ownsTCPListener(pid: getpid(), port: 18080), "recognizes the listener owned by this process")

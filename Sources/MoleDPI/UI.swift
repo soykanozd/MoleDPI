@@ -240,7 +240,8 @@ struct Panel: View {
                 .disabled(model.showDetails)
                 .accessibilityHidden(model.showDetails)
             if model.showDetails {
-                about.transition(.opacity)
+                if let report = model.diagnostics { diagnostics(report).transition(.opacity) }
+                else { about.transition(.opacity) }
             }
         }
         .frame(width: PanelMetrics.width, height: PanelMetrics.height)
@@ -248,13 +249,32 @@ struct Panel: View {
         .preferredColorScheme(.dark)
         .contextMenu {
             if hasError {
-                Button("Copy Error Details") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(model.detail, forType: .string)
+                Button("Review Diagnostics") {
+                    model.showDetails = true
+                    model.reviewDiagnostics()
                 }
             }
             Button("Quit MoleDPI") { NSApplication.shared.terminate(nil) }
         }
+    }
+    private func diagnostics(_ report: String) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Diagnostics").font(.system(size: 20, weight: .semibold))
+                Spacer()
+                Button { model.diagnostics = nil } label: {
+                    Image(systemName: "xmark").frame(width: 26, height: 28)
+                }.buttonStyle(.plain).accessibilityLabel("Back to About MoleDPI")
+            }.frame(height: 52)
+            Text("Review before sharing. Nothing is sent automatically.")
+                .font(.system(size: 13)).foregroundStyle(MolePalette.secondary)
+            ScrollView { Text(report).font(.system(size: 12, design: .monospaced))
+                .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+            Button("Copy Report") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(report, forType: .string)
+            }.padding(.bottom, 14)
+        }.padding(.horizontal, 18).padding(.top, 8)
     }
     private var about: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -278,6 +298,7 @@ struct Panel: View {
                     }.foregroundStyle(MolePalette.secondary)
                     Text("The internet should be open to everyone.").bold()
                     Text("Experimental · Bugs and connection failures may occur.").font(.system(size: 12)).foregroundStyle(MolePalette.secondary)
+                    Button("Review Diagnostics") { model.reviewDiagnostics() }.buttonStyle(.plain)
                     Text("MoleDPI · Free & Open Source")
                         .font(.system(size: 12)).foregroundStyle(MolePalette.secondary)
                 }

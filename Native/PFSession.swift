@@ -203,7 +203,10 @@ final class SignalFlag: @unchecked Sendable {
             let check = try command(pfctl, ["-a", name, "-sr"])
             guard check.code == 0, check.text.contains("route-to"), engine.isRunning else { throw Failure(message: "PF / tpws durumu doğrulanamadı.") }
             if profile >= 3 {
-                let settings: [String: Any] = ["ServerAddresses": ["9.9.9.9"], "ServerPort": 9953,
+                guard ListenerReadiness.ownsTCPListener(pid: parent, port: 18083) else {
+                    throw Failure(message: "Encrypted DNS listener is not owned by the client.")
+                }
+                let settings: [String: Any] = ["ServerAddresses": ["127.0.0.1"], "ServerPort": 18083,
                     "SupplementalMatchDomains": ["discord.com", "discord.gg", "discordapp.com", "discordapp.net", "roblox.com", "rbxcdn.com"],
                     "SupplementalMatchDomainsNoSearch": 1]
                 guard let store = SCDynamicStoreCreate(nil, "MoleDPI DNS" as CFString, nil, nil),

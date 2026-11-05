@@ -4,14 +4,7 @@ struct Probe {
     enum Transport: Sendable { case direct, http, socks }
     // Diagnostics use only fixed public service names. TLS still verifies the original name.
     static func alternateAddress(_ host: String) async -> String? {
-        guard ["discord.com", "www.roblox.com"].contains(host) else { return nil }
-        let p = Process(), pipe = Pipe()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/dig")
-        p.arguments = ["+short", "+time=2", "+tries=1", "@9.9.9.9", "-p", "9953", host, "A"]
-        p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
-        do { try await OwnedCommand(p).run() } catch { return nil }
-        let lines = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self).split(whereSeparator: \.isNewline)
-        return lines.map(String.init).first { var ip = in_addr(); return inet_pton(AF_INET, $0, &ip) == 1 }
+        await EncryptedDNS.lookup(host)
     }
     static func check(host: String, proxy: Bool) async -> Bool { await check(host: host, using: proxy ? .http : .direct) }
 

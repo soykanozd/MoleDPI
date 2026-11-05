@@ -8,7 +8,7 @@ A free, open-source macOS menu-bar application for trying local DPI circumventio
 
 **Apple Silicon · macOS 13 or later**
 
-1. Download **[MoleDPI.dmg](../../releases/download/v0.9.1-beta/MoleDPI.dmg)** from Releases. For this experimental pre-release, use **[all releases](../../releases)**.
+1. Download **[MoleDPI.dmg](../../releases/download/v0.9.2-beta/MoleDPI.dmg)** from Releases. For this experimental pre-release, use **[all releases](../../releases)**.
 2. Open the disk image and drag **MoleDPI** onto **Applications**.
 3. Open MoleDPI from Applications.
 4. Click the helmet in the menu bar, then **Connect**.
@@ -34,7 +34,7 @@ MoleDPI tests local TCP/TLS splitting strategies, then uses a restricted helper 
 
 The controller tolerates isolated health-check failures and attempts controlled recovery after a worker failure. Reconnection uses bounded backoff, pauses new worker attempts while offline, and stops when you choose Disconnect or Quit. Reopening the app never automatically connects.
 
-If the ordinary DNS path fails for Discord or Roblox, MoleDPI can use Quad9 on port 9953 and a temporary, domain-scoped macOS resolver. This affects those domains across the Mac during the session.
+If the ordinary DNS path fails for Discord or Roblox, MoleDPI can use Quad9 DNS-over-HTTPS through a session-only loopback bridge and a temporary, domain-scoped macOS resolver. This affects those domains across the Mac during the session.
 
 ## Known limitations
 
@@ -42,7 +42,7 @@ If the ordinary DNS path fails for Discord or Roblox, MoleDPI can use Quad9 on p
 - Apple Silicon binaries only. Minimum target macOS 13; runtime verification has been limited to a recent macOS release. Older macOS versions, Intel Macs and a clean-Mac install are not certified.
 - TCP 80/443 only. **No system-wide UDP or QUIC bypass. Discord voice, screen sharing and Roblox game sessions are not guaranteed.**
 - Your public IP remains visible. This is not an anonymity service.
-- Supplemental DNS queries to Quad9 are unencrypted. Your DNS provider can see queries. HTTPS certificate validation stays enabled.
+- Supplemental recovery queries use a local UDP/TCP bridge and certificate-verified DNS-over-HTTPS to Quad9. Quad9 can see those queries. Ordinary system DNS queries outside recovery remain governed by your system settings. HTTPS certificate validation stays enabled.
 - Checks contact example.com, discord.com and www.roblox.com. No browsing history, traffic-content logging or analytics SDK is included.
 - VPNs, firewalls, sleep/wake and network changes may affect reliability. Long-duration stability has not been certified.
 - Network processing uses root-owned software. Independent security review is still needed.
@@ -59,6 +59,11 @@ The engine is [zapret tpws](https://github.com/bol-van/zapret), pinned at `73ee2
 MoleDPI is **GPL-3.0-only**. See [LICENSE](LICENSE), [NOTICE](NOTICE) and [THIRD-PARTY.md](THIRD-PARTY.md). Complete corresponding source and build scripts are distributed alongside the binary and within its application bundle. Upstream copyright notices are retained.
 
 See [BUILDING.md](BUILDING.md) for developer instructions.
+
+## Diagnostics
+Open **? → Review Diagnostics**, inspect the text, then choose **Copy Report** if you want to share it in an issue. Reports contain only allowlisted connection state and counters. Raw errors, account identifiers, IP addresses, paths and browsing history are excluded. Nothing is uploaded automatically.
+
+The app uses public DNS infrastructure and your existing internet connection. It has no paid account, developer-operated relay, subscription or metered application API.
 
 ## Report a bug
 

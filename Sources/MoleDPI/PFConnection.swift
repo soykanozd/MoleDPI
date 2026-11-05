@@ -38,6 +38,8 @@ actor PFConnection: ConnectionEngine {
         ["--split-pos=2", "--oob=tls"],
         ["--split-pos=host+1", "--tlsrec=host+1"]
     ]
+    private let requireDNSRecovery: Bool
+    init(requireDNSRecovery: Bool = false) { self.requireDNSRecovery = requireDNSRecovery }
     private var generation = UUID()
     private var exitSignal: DispatchSemaphore?
     private var preflight: Process?
@@ -45,6 +47,7 @@ actor PFConnection: ConnectionEngine {
     private var heartbeatTask: Task<Void, Never>?
     private var heartbeatURL: URL?
     private var statusURL: URL?
+    private var dnsRelay: DNSRelay?
     private var activeProfile: Int?
 
     static func resource(_ name: String) throws -> URL {
@@ -159,6 +162,13 @@ actor PFConnection: ConnectionEngine {
             let binary = try Self.resource("tpws")
             var selected: Int?
             var alternate: [String:String] = [:]
+            if requireDNSRecovery {
+                for site in targets {
+                    alternate[site.host] = await Probe.alternateAddress(site.host)
+                }
+                let relay = DNSRelay(); dnsRelay = relay
+                try await relay.start(); try valid(id)
+            }
             for profile in Self.profiles.indices {
                 try valid(id)
                 let process = Process(); process.executableURL = binary
@@ -183,11 +193,17 @@ actor PFConnection: ConnectionEngine {
                 guard process.isRunning else { stopPreflight(); throw RoutingError.message("tpws başlatılamadı; 18081 portu kullanımda olabilir.") }
                 clock.mark("engine.probe-readiness-gate")
                 var results = await Self.checks(targets, transport: .socks, addresses: alternate)
-                if profile == 0, results.contains(where: { $0.reachable != true }) {
+                if alternate.isEmpty, profile == 0, results.contains(where: { $0.reachable != true }) {
                     for site in results where site.reachable != true {
                         alternate[site.host] = await Probe.alternateAddress(site.host)
                     }
                     try valid(id)
+                    if !alternate.isEmpty {
+                        let relay = DNSRelay()
+                        dnsRelay = relay
+                        try await relay.start()
+                        try valid(id)
+                    }
                     if !alternate.isEmpty { results = await Self.checks(targets, transport: .socks, addresses: alternate) }
                 }
                 try valid(id)
@@ -280,6 +296,7 @@ actor PFConnection: ConnectionEngine {
             }
         }
         guard preflight == nil else { throw RoutingError.message("The local network probe is still stopping.") }
+        dnsRelay?.stop(); dnsRelay = nil
         service?.invalidate(); service = nil
         if let dir = heartbeatURL?.deletingLastPathComponent() { try? FileManager.default.removeItem(at: dir) }
         heartbeatURL = nil; statusURL = nil; activeProfile = nil

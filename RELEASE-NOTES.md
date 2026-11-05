@@ -1,15 +1,11 @@
-# v0.9.1-beta — Experimental Apple Silicon preview
-
+# v0.9.2-beta — Experimental privacy update
 **Experimental. Bugs, disconnections and network interruptions may occur.**
+- Supplemental Discord/Roblox DNS recovery now uses certificate-verified DNS-over-HTTPS through a session-only localhost UDP/TCP bridge.
+- Recovery uses Quad9 HTTPS with a fixed bootstrap address. There is no plaintext upstream fallback for recovery. Other system DNS settings remain in effect for ordinary queries.
+- Review and copy an allowlisted diagnostics report from About. Nothing is automatically uploaded.
+- No paid services, accounts, telemetry, developer-operated servers or subscriptions added.
+- Existing TCP bypass, connection recovery and manual Disconnect/ Quit priorities remain.
 
-- Local TCP/TLS splitting with source-built zapret tpws.
-- A compact menu-bar interface, real-state digging/OK-paw animation and About screen.
-- Controlled recovery, manual Disconnect priority and safe Quit.
-- Temporary Discord/Roblox DNS recovery when the ordinary resolver path fails.
-- Drag-to-Applications DMG and graphical helper-removal tool.
+Apple Silicon, macOS 13+. Ad-hoc signed, not Apple-notarized. Gatekeeper may block the downloaded app. Experimental software provided without warranty. UDP game/voice bypass is not claimed.
 
-This build is ad-hoc signed and not Apple-notarized. Gatekeeper may block it. Do not disable system security protections. See README for the current installation limits.
-
-No UDP bypass or guarantee for Discord voice, screen sharing, Roblox games or every network is claimed. A clean-Mac install, full uninstall, older macOS compatibility and long-duration stability still need manual verification.
-
-Assets: MoleDPI.dmg, MoleDPI-source.zip and SHA256SUMS. All published files are experimental.
+Assets: MoleDPI.dmg, MoleDPI-source.zip and SHA256SUMS. See README for installation and limitations.

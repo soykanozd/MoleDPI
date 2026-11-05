@@ -9,6 +9,7 @@ import Network
     @Published var detail = "The mole is still above ground."
     @Published var sites: [SiteCheck]
     @Published var showDetails = false
+    @Published var diagnostics: String?
     @Published var showMode = false
     @Published var recoveryNeeded = false
     @Published private(set) var quitting = false
@@ -84,6 +85,19 @@ import Network
             guard wantsConnection, !quitting, networkAvailable else { return }
             connect()
         }
+    }
+    func reviewDiagnostics() {
+        // Allowlist only; raw errors and system dictionaries are excluded.
+        diagnostics = [
+            "MoleDPI experimental diagnostics",
+            "State: " + String(describing: state),
+            "Connection requested: " + String(wantsConnection),
+            "Recovering: " + String(recovering),
+            "Cleanup required: " + String(recoveryNeeded),
+            "Verified targets: " + String(sites.filter { $0.reachable == true }.count) + "/" + String(sites.count),
+            "Recovery DNS transport: HTTPS (when activated)",
+            "No IP addresses, paths, browsing history or raw errors included."
+        ].joined(separator: "\n")
     }
     func connect() {
         guard !quitting, reconnectTask == nil, state == .off, !recoveryNeeded else { return }

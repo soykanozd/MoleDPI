@@ -24,14 +24,18 @@ enum ServiceClient {
         var code: SecCode?
         var disk: SecStaticCode?
         var info: CFDictionary?
-        guard SecCodeCopySelf([], &code) == errSecSuccess, let code,
-              SecCodeCopyStaticCode(code, [], &disk) == errSecSuccess, let disk,
-              SecStaticCodeCheckValidity(disk, [], nil) == errSecSuccess,
-              SecCodeCheckValidity(code, [], nil) == errSecSuccess,
-              SecCodeCopySigningInformation(disk, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess,
-              let manifest = (info as NSDictionary?)?[kSecCodeInfoPList] as? [String: Any],
+        var result = SecCodeCopySelf([], &code)
+        guard result == errSecSuccess, let code else { throw RoutingError.message("Running code lookup failed: \(result)") }
+        result = SecCodeCopyStaticCode(code, [], &disk)
+        guard result == errSecSuccess, let disk else { throw RoutingError.message("Static code lookup failed: \(result)") }
+        result = SecStaticCodeCheckValidity(disk, [], nil)
+        guard result == errSecSuccess else { throw RoutingError.message("Installed code verification failed: \(result)") }
+        result = SecCodeCheckValidity(code, [], nil)
+        guard result == errSecSuccess else { throw RoutingError.message("Running code verification failed: \(result)") }
+        result = SecCodeCopySigningInformation(disk, SecCSFlags(rawValue: kSecCSSigningInformation), &info)
+        guard result == errSecSuccess, let manifest = (info as NSDictionary?)?[kSecCodeInfoPList] as? [String:Any],
               let digest = (info as NSDictionary?)?[kSecCodeInfoUnique] as? Data else {
-            throw RoutingError.message("Could not identify the running application.")
+            throw RoutingError.message("Signed manifest lookup failed: \(result)")
         }
         return (try hex(digest.map { String(format: "%02x", $0) }.joined(), length: 40), manifest)
     }

@@ -21,8 +21,8 @@ import Combine
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let arguments = Array(CommandLine.arguments.dropFirst())
-        if arguments == ["--verify-network"] {
-            Task { let code = await NetworkVerification.run(); exit(code) }
+        if arguments == ["--verify-network"] || arguments == ["--verify-encrypted-dns"] {
+            Task { let code = await NetworkVerification.run(encryptedDNS: arguments == ["--verify-encrypted-dns"]); exit(code) }
             return
         }
         if Bundle.main.bundleURL.path != "/Applications/MoleDPI.app" {

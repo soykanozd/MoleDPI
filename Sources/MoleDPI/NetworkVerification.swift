@@ -5,15 +5,15 @@ import SystemConfiguration
 // Opt-in integration check executed by the actual installed, authenticated client.
 // No caller-controlled destinations, PF rules, worker arguments or executable paths.
 enum NetworkVerification {
-    @MainActor static func run() async -> Int32 {
-        let engine = PFConnection()
+    @MainActor static func run(encryptedDNS: Bool = false) async -> Int32 {
+        let engine = PFConnection(requireDNSRecovery: encryptedDNS)
         let targets = ["example.com", "discord.com", "www.roblox.com"].map { SiteCheck(host: $0, name: $0) }
         do {
             let config = try Data(contentsOf: URL(fileURLWithPath: "/etc/pf.conf"))
             let proxy = SCDynamicStoreCopyProxies(nil) as NSDictionary?
             _ = try await ServiceClient.prepare()
             let model = Model(engine: engine, sites: targets)
-            for cycle in 1...10 {
+            for cycle in 1...(encryptedDNS ? 2 : 10) {
                 model.connect()
                 await model.task?.value
                 guard model.state == .on else { throw RoutingError.message(model.detail) }
