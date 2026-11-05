@@ -38,6 +38,10 @@ actor PFConnection: ConnectionEngine {
         ["--split-pos=2", "--oob=tls"],
         ["--split-pos=host+1", "--tlsrec=host+1"]
     ]
+    static func strategyOrder(saved: Int? = UserDefaults.standard.object(forKey: "MoleDPI.verifiedStrategy.v1") as? Int) -> [Int] {
+        guard let saved, profiles.indices.contains(saved) else { return Array(profiles.indices) }
+        return [saved] + profiles.indices.filter { $0 != saved }
+    }
     private let requireDNSRecovery: Bool
     init(requireDNSRecovery: Bool = false) { self.requireDNSRecovery = requireDNSRecovery }
     private var generation = UUID()
@@ -169,7 +173,7 @@ actor PFConnection: ConnectionEngine {
                 let relay = DNSRelay(); dnsRelay = relay
                 try await relay.start(); try valid(id)
             }
-            for profile in Self.profiles.indices {
+            for (orderIndex, profile) in Self.strategyOrder().enumerated() {
                 try valid(id)
                 let process = Process(); process.executableURL = binary
                 process.arguments = ["--socks", "--bind-addr=127.0.0.1", "--port=18081", "--maxconn=128", "--filter-tcp=80,443", "--filter-l7=http,tls"] + Self.profiles[profile]
@@ -193,7 +197,7 @@ actor PFConnection: ConnectionEngine {
                 guard process.isRunning else { stopPreflight(); throw RoutingError.message("tpws başlatılamadı; 18081 portu kullanımda olabilir.") }
                 clock.mark("engine.probe-readiness-gate")
                 var results = await Self.checks(targets, transport: .socks, addresses: alternate)
-                if alternate.isEmpty, profile == 0, results.contains(where: { $0.reachable != true }) {
+                if alternate.isEmpty, orderIndex == 0, results.contains(where: { $0.reachable != true }) {
                     for site in results where site.reachable != true {
                         alternate[site.host] = await Probe.alternateAddress(site.host)
                     }
@@ -243,6 +247,7 @@ actor PFConnection: ConnectionEngine {
             guard (readStatus()?["packets"] as? NSNumber)?.uint64Value ?? 0 > 0, results.allSatisfy({ $0.reachable == true }), readStatus()?["phase"] as? String == "active", service != nil else {
                 throw RoutingError.message("PF üzerinden HTTPS erişimi doğrulanamadı; bağlantı geri alınıyor.")
             }
+            UserDefaults.standard.set(profile % 3, forKey: "MoleDPI.verifiedStrategy.v1")
             clock.mark("engine.counter-verified")
             return results.enumerated().map { i, site in var result = site; result.direct = baseline[i].reachable; return result }
         } catch {

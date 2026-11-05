@@ -109,7 +109,7 @@ import Combine
                     pendingSystemReply = false
                     NSApp.reply(toApplicationShouldTerminate: false)
                 }
-                model.quitError = error.localizedDescription
+                model.quitError = FriendlyError.message(error)
                 model.showDetails = false
                 showPanel()
             }

@@ -11,7 +11,7 @@ actor TestEngine: ConnectionEngine {
     func stop() { proxy.stop() }
 }
 actor DeniedEngine: ConnectionEngine {
-    func start(targets: [SiteCheck]) throws -> [SiteCheck] { throw RoutingError.message("Test: ağ izni reddedildi") }
+    func start(targets: [SiteCheck]) throws -> [SiteCheck] { throw HelperApprovalDenied() }
     func health(targets: [SiteCheck]) -> [SiteCheck]? { nil }
     func stop() { }
 }
@@ -59,7 +59,7 @@ actor RecoverOnRetry: ConnectionEngine {
         denied.connect()
         let failureDeadline = Date().addingTimeInterval(5)
         while denied.state == .digging && Date() < failureDeadline { try await Task.sleep(nanoseconds: 50_000_000) }
-        try expect(denied.state == .off && denied.detail.contains("reddedildi"), "authorization failure never displays connected")
+        try expect(denied.state == .off && denied.detail.contains("Permission"), "authorization failure never displays connected")
         try expect(!denied.showDetails, "connection failure must not open settings")
         let unrestorable = Model(engine: UnrestorableEngine())
         var quitAllowed = false; var quitRejected = false

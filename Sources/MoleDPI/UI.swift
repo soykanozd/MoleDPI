@@ -224,9 +224,9 @@ struct Panel: View {
     }
     private var subtitle: String {
         if model.quitError != nil { return "Network cleanup needs attention. Retry to finish." }
-        if model.recovering { return "Restoring your connection..." }
+        if model.recovering { return model.issueMessage ?? "Restoring your connection..." }
         switch model.state {
-        case .off: return hasError ? "The mole could not finish the tunnel." : "The mole is still above ground."
+        case .off: return hasError ? (model.issueMessage ?? "Connection failed. Please try again.") : "The mole is still above ground."
         case .digging: return "The mole is digging its way..."
         case .on: return "You're now underground."
         case .emerging: return "The mole is returning above ground."
@@ -298,6 +298,7 @@ struct Panel: View {
                     }.foregroundStyle(MolePalette.secondary)
                     Text("The internet should be open to everyone.").bold()
                     Text("Experimental · Bugs and connection failures may occur.").font(.system(size: 12)).foregroundStyle(MolePalette.secondary)
+                    UpdateControls(checker: model.updates)
                     Button("Review Diagnostics") { model.reviewDiagnostics() }.buttonStyle(.plain)
                     Text("MoleDPI · Free & Open Source")
                         .font(.system(size: 12)).foregroundStyle(MolePalette.secondary)

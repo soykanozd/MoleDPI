@@ -8,7 +8,7 @@ A free, open-source macOS menu-bar application for trying local DPI circumventio
 
 **Apple Silicon · macOS 13 or later**
 
-1. Download **[MoleDPI.dmg](../../releases/download/v0.9.2-beta/MoleDPI.dmg)** from Releases. For this experimental pre-release, use **[all releases](../../releases)**.
+1. Download **[MoleDPI.dmg](../../releases/download/v0.9.3-beta/MoleDPI.dmg)** from Releases. For this experimental pre-release, use **[all releases](../../releases)**.
 2. Open the disk image and drag **MoleDPI** onto **Applications**.
 3. Open MoleDPI from Applications.
 4. Click the helmet in the menu bar, then **Connect**.
@@ -59,6 +59,11 @@ The engine is [zapret tpws](https://github.com/bol-van/zapret), pinned at `73ee2
 MoleDPI is **GPL-3.0-only**. See [LICENSE](LICENSE), [NOTICE](NOTICE) and [THIRD-PARTY.md](THIRD-PARTY.md). Complete corresponding source and build scripts are distributed alongside the binary and within its application bundle. Upstream copyright notices are retained.
 
 See [BUILDING.md](BUILDING.md) for developer instructions.
+
+## Network changes and updates
+When the network changes or the Mac wakes, MoleDPI coalesces an immediate health check and preserves a working engine. A successful strategy number is saved locally and tried first next time; all candidates still undergo real verification. No network name or address is saved with this preference.
+
+In **? → Check for Updates**, you can manually request GitHub release metadata. Checking is optional and contacts GitHub, which can see your request IP. No account, token or diagnostics is sent. **View Release** opens the project release page. Downloads and installation remain under your control.
 
 ## Diagnostics
 Open **? → Review Diagnostics**, inspect the text, then choose **Copy Report** if you want to share it in an issue. Reports contain only allowlisted connection state and counters. Raw errors, account identifiers, IP addresses, paths and browsing history are excluded. Nothing is uploaded automatically.
