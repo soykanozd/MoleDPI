@@ -9,6 +9,9 @@ struct Probe {
     static func check(host: String, proxy: Bool) async -> Bool { await check(host: host, using: proxy ? .http : .direct) }
 
     static func check(host: String, using transport: Transport, address: String? = nil) async -> Bool {
+        await failure(host: host, using: transport, address: address) == nil
+    }
+    static func failure(host: String, using transport: Transport, address: String? = nil) async -> ConnectionIssue? {
         let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
         let proxy: String
         switch transport { case .direct: proxy = ""; case .http: proxy = "http://127.0.0.1:18080"; case .socks: proxy = "socks5h://127.0.0.1:18081" }
@@ -28,7 +31,7 @@ struct Probe {
                 print(String(format: "TIMING curl.local-name-lookup %.2f ms", seconds * 1000))
             }
             if ConnectClock.enabled && p.terminationStatus != 0 { print("PROBE exit=\(p.terminationStatus)") }
-            return p.terminationStatus == 0
-        } catch { return false }
+            return ConnectionIssue.curlExit(p.terminationStatus)
+        } catch { return .localEngine }
     }
 }

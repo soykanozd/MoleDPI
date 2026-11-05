@@ -21,6 +21,10 @@ import Combine
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let arguments = Array(CommandLine.arguments.dropFirst())
+        if arguments == ["--verify-network-recovery"] {
+            Task { exit(await NetworkVerification.recovery()) }
+            return
+        }
         if arguments == ["--verify-network"] || arguments == ["--verify-encrypted-dns"] {
             Task { let code = await NetworkVerification.run(encryptedDNS: arguments == ["--verify-encrypted-dns"]); exit(code) }
             return

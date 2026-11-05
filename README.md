@@ -8,7 +8,7 @@ A free, open-source macOS menu-bar application for trying local DPI circumventio
 
 **Apple Silicon · macOS 13 or later**
 
-1. Download **[MoleDPI.dmg](../../releases/download/v1.0.0/MoleDPI.dmg)** from Releases. For other releases, use **[all releases](../../releases)**.
+1. Download **[MoleDPI.dmg](../../releases/download/v1.0.1/MoleDPI.dmg)** from Releases. For other releases, use **[all releases](../../releases)**.
 2. Open the disk image and drag **MoleDPI** onto **Applications**.
 3. Open MoleDPI from Applications.
 4. Click the helmet in the menu bar, then **Connect**.
@@ -34,16 +34,16 @@ MoleDPI tests local TCP/TLS splitting strategies, then uses a restricted helper 
 
 The controller tolerates isolated health-check failures and attempts controlled recovery after a worker failure. Reconnection uses bounded backoff, pauses new worker attempts while offline, and stops when you choose Disconnect or Quit. Reopening the app never automatically connects.
 
-If the ordinary DNS path fails for Discord or Roblox, MoleDPI can use Quad9 DNS-over-HTTPS through a session-only loopback bridge and a temporary, domain-scoped macOS resolver. This affects those domains across the Mac during the session.
+If the ordinary DNS path fails for supported recovery domains, MoleDPI can use Quad9 DNS-over-HTTPS through a session-only loopback bridge and a temporary, domain-scoped macOS resolver. This affects those domains across the Mac during the session.
 
 ## Known limitations
 
 - **Experimental software. Bugs and outages are possible.**
 - Apple Silicon binaries only. Minimum target macOS 13; runtime verification has been limited to a recent macOS release. Older macOS versions, Intel Macs and a clean-Mac install are not certified.
-- TCP 80/443 only. **No system-wide UDP or QUIC bypass. Discord voice, screen sharing and Roblox game sessions are not guaranteed.**
+- TCP 80/443 only. **No system-wide UDP or QUIC bypass. Voice calls, screen sharing and game sessions are not guaranteed.**
 - Your public IP remains visible. This is not an anonymity service.
 - Supplemental recovery queries use a local UDP/TCP bridge and certificate-verified DNS-over-HTTPS to Quad9. Quad9 can see those queries. Ordinary system DNS queries outside recovery remain governed by your system settings. HTTPS certificate validation stays enabled.
-- Checks contact example.com, discord.com and www.roblox.com. No browsing history, traffic-content logging or analytics SDK is included.
+- Checks contact fixed public HTTPS control destinations listed in the source (`Model.swift`). These are test endpoints, not application-specific support promises. No browsing history, traffic-content logging or analytics SDK is included.
 - VPNs, firewalls, sleep/wake and network changes may affect reliability. Long-duration stability has not been certified.
 - Network processing uses root-owned software. Independent security review is still needed.
 - Application-controlled error messages are in English; macOS-generated dialogs follow the system language.
@@ -73,3 +73,8 @@ The app uses public DNS infrastructure and your existing internet connection. It
 ## Report a bug
 
 Use [Issues](../../issues). Include the app version, macOS version, action and error. Do not include passwords, tokens, browsing history, personal network details or unredacted screenshots.
+
+### Connection help and network recovery
+**? → Connection Help** explains the last observed failure category and safe next steps. DNS lookup, TLS, timeout, remote HTTP response and local engine failures are distinguished when there is evidence. An access failure alone cannot prove censorship. Diagnostics include the category only, never raw command output or destinations.
+
+Wake and path events invalidate results from earlier network checks. The controller retains its consecutive-failure count across refreshes, preserves a working engine and pauses checks/new attempts during system sleep. Manual Disconnect and Quit still prevent reconnection. Physical sleep/wake and Wi-Fi roaming require testing on your own network; deterministic tests do not certify every network.

@@ -1,10 +1,11 @@
-# v1.0.0 experimental release verification
-Short tests only. No overnight or long-duration network test was performed.
+# v1.0.1 experimental release verification
 
-- Existing parser, TLS payload integrity, restoration, permission rejection, cleanup failure, duplicate Quit and listener ownership tests passed.
-- Nine injected-timing controller tests passed: isolated health failure, endpoint failure, UI independence, offline waiting, engine-loss recovery, manual Disconnect, Quit during recovery, offline startup and network return.
-- Ten feature checks passed: cached strategy order/fallback, release-version ordering and invalid input, update URL restriction, permission guidance, private-data filtering, coalesced immediate health checks and manual Disconnect priority.
-- Source-built ARM64 app and helpers, the graphical removal tool, local signatures and DMG structure are verified during packaging.
-- The installed v1.0.0 passed a real Connected panel close/reopen health check followed by Quit, and a Connecting-to-Quit check. Both main test processes exited normally. These are short local checks, not physical sleep/Wi-Fi or clean-machine acceptance.
-- Previous experimental versions passed local real HTTPS/PF sessions, scoped encrypted-DNS UDP/TCP checks and application-crash cleanup. Those historical tests do not certify all networks or this version for long-duration use.
-- Developer ID, notarization, quarantined clean-Mac installation, graphical removal in a fresh account, Intel, older macOS devices and real sleep/Wi-Fi transitions remain unverified.
+Short local tests only. No overnight or long-duration network test was performed.
+
+- 42 automated check results passed across smoke, stability, feature and network-recovery suites (`./scripts/test.sh`).
+- New checks cover curl error categories, stale health results after network loss, actionable offline help, preserving a healthy worker, pausing checks during sleep, repeated wake events, failure streaks across refreshes, sanitized diagnostics, Connect during sleep, manual Disconnect and Quit priority.
+- Production ARM64 build and strict deep ad-hoc signature verification passed. Packaging verifies the DMG and signs the bundled removal application.
+- Three local live HTTPS/PF cycles with injected controller network/wake events preserved the original engine session. PF configuration and proxy settings matched after Disconnect. These checks use the real engine and HTTPS but **do not physically change Wi-Fi or put the Mac to sleep**.
+- The fixed 330 × 430 pt help panel was rendered and visually reviewed; long help text is scrollable.
+- Prior v1.0.0 short live panel/quit checks and historical DNS/crash-cleanup tests are not substitutes for acceptance testing this release on other networks.
+- Developer ID/notarization, quarantined clean-Mac installation, graphical removal in a fresh account, Intel, older macOS devices, physical sleep/Wi-Fi transitions, long-duration stability and independent security review remain unverified.

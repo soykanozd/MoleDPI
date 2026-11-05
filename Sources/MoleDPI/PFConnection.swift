@@ -19,6 +19,7 @@ struct SiteCheck: Identifiable, Sendable {
     let name: String
     var reachable: Bool?
     var direct: Bool?
+    var failure: ConnectionIssue?
     var id: String { host }
 }
 protocol ConnectionEngine: Sendable {
@@ -71,7 +72,8 @@ actor PFConnection: ConnectionEngine {
             for target in targets {
                 group.addTask {
                     var result = target
-                    result.reachable = await Probe.check(host: target.host, using: transport, address: addresses[target.host])
+                    result.failure = await Probe.failure(host: target.host, using: transport, address: addresses[target.host])
+                    result.reachable = result.failure == nil
                     return result
                 }
             }
@@ -166,6 +168,7 @@ actor PFConnection: ConnectionEngine {
             let binary = try Self.resource("tpws")
             var selected: Int?
             var alternate: [String:String] = [:]
+            var lastResults = targets
             if requireDNSRecovery {
                 for site in targets {
                     alternate[site.host] = await Probe.alternateAddress(site.host)
@@ -214,12 +217,13 @@ actor PFConnection: ConnectionEngine {
                 // Check process identity/liveness as well as real HTTPS; never
                 // mistake an unrelated listener's successful request for ours.
                 clock.mark("engine.socks-https-done")
+                lastResults = results
                 let running = process.isRunning
                 stopPreflight()
                 guard preflight == nil else { throw RoutingError.message("Network probe did not stop.") }
                 if running && results.allSatisfy({ $0.reachable == true }) { selected = profile + (alternate.isEmpty ? 0 : 3); break }
             }
-            guard let profile = selected else { throw RoutingError.message("The available strategies could not verify secure web access.") }
+            guard let profile = selected else { throw ConnectionIssue.summarize(lastResults) }
             try valid(id)
             clock.mark("engine.preflight-done")
             let baseline = await directChecks // Direct measurements must finish before installing PF rules.
@@ -245,7 +249,7 @@ actor PFConnection: ConnectionEngine {
                 try valid(id); try await Task.sleep(nanoseconds: 150_000_000)
             }
             guard (readStatus()?["packets"] as? NSNumber)?.uint64Value ?? 0 > 0, results.allSatisfy({ $0.reachable == true }), readStatus()?["phase"] as? String == "active", service != nil else {
-                throw RoutingError.message("Could not verify HTTPS through PF. Restoring the session.")
+                throw results.allSatisfy({ $0.reachable == true }) ? ConnectionIssue.localEngine : ConnectionIssue.summarize(results)
             }
             UserDefaults.standard.set(profile % 3, forKey: "MoleDPI.verifiedStrategy.v1")
             clock.mark("engine.counter-verified")

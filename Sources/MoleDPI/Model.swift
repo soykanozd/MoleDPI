@@ -11,6 +11,12 @@ import AppKit
     @Published var sites: [SiteCheck]
     @Published var showDetails = false
     @Published var diagnostics: String?
+    @Published var reportTitle = "Diagnostics"
+    private var lastIssue: ConnectionIssue?
+    private var networkRevision: UInt64 = 0
+    private var sleeping = false
+    private var completeFailures = 0
+    private var sleepObserver: NSObjectProtocol?
     @Published var showMode = false
     @Published var recoveryNeeded = false
     @Published private(set) var quitting = false
@@ -44,9 +50,9 @@ import AppKit
     private var stopped: [() -> Void] = []
     private var failed: [() -> Void] = []
     init(engine: any ConnectionEngine = PFConnection(), sites: [SiteCheck] = [
-        SiteCheck(host: "example.com", name: "Web"),
-        SiteCheck(host: "discord.com", name: "Discord web"),
-        SiteCheck(host: "www.roblox.com", name: "Roblox web")
+        SiteCheck(host: "example.com", name: "HTTPS check 1"),
+        SiteCheck(host: "discord.com", name: "HTTPS check 2"),
+        SiteCheck(host: "www.roblox.com", name: "HTTPS check 3")
     ], monitorNetwork: Bool = true, healthInterval: UInt64 = 30_000_000_000,
          sleep: @escaping @Sendable (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }) {
         self.engine = engine; self.sites = sites; self.healthInterval = healthInterval; self.sleep = sleep
@@ -57,32 +63,51 @@ import AppKit
                 Task { @MainActor [weak self] in self?.networkChanged(available) }
             }
             wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor [weak self] in self?.refreshHealth() }
+                Task { @MainActor [weak self] in self?.systemDidWake() }
+            }
+            sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor [weak self] in self?.systemWillSleep() }
             }
             path.start(queue: DispatchQueue(label: "MoleDPI.network-path"))
         }
     }
     deinit {
+        if let sleepObserver { NSWorkspace.shared.notificationCenter.removeObserver(sleepObserver) }
         pathMonitor?.cancel()
         if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
     }
+    func systemWillSleep() {
+        sleeping = true
+        networkRevision &+= 1
+        monitor?.cancel()
+        if wantsConnection { recovering = true; issueMessage = "Waiting for the Mac to wake." }
+    }
+    func systemDidWake() {
+        sleeping = false
+        networkRevision &+= 1
+        guard wantsConnection, !quitting else { return }
+        if state == .on { refreshHealth() }
+        else if state == .off { scheduleRecovery() }
+    }
     func refreshHealth() {
-        guard wantsConnection, !quitting, state == .on, reconnectTask == nil, refreshTask == nil else { return }
+        guard wantsConnection, !quitting, !sleeping, state == .on, reconnectTask == nil, refreshTask == nil else { return }
         let old = monitor
         old?.cancel()
         refreshTask = Task {
             await old?.value
-            guard wantsConnection, !quitting, !Task.isCancelled, reconnectTask == nil, state == .on else { refreshTask = nil; return }
+            guard wantsConnection, !quitting, !sleeping, !Task.isCancelled, reconnectTask == nil, state == .on else { refreshTask = nil; return }
             startMonitoring(immediate: true)
             refreshTask = nil
         }
     }
     func networkChanged(_ available: Bool) {
+        networkRevision &+= 1
         networkAvailable = available
         guard wantsConnection, !quitting else { return }
         if !available {
             recovering = true
-            issueMessage = "No internet connection. Waiting for the network."
+            lastIssue = .offline
+            issueMessage = ConnectionIssue.offline.message
         } else if state == .off { scheduleRecovery() }
         else if state == .on { refreshHealth() }
     }
@@ -101,20 +126,28 @@ import AppKit
             }
             guard wantsConnection, !quitting, !Task.isCancelled else { reconnectTask = nil; return }
             state = .off
-            guard networkAvailable else { reconnectTask = nil; return }
+            guard networkAvailable, !sleeping else { reconnectTask = nil; return }
             let seconds = min(30, 1 << min(attempt, 5))
             attempt += 1
             do { try await sleep(UInt64(seconds) * 1_000_000_000) }
             catch { reconnectTask = nil; return }
             reconnectTask = nil
-            guard wantsConnection, !quitting, networkAvailable else { return }
+            guard wantsConnection, !quitting, networkAvailable, !sleeping else { return }
             connect()
         }
     }
+    func reviewConnectionHelp() {
+        reportTitle = "Connection Help"
+        let issue = lastIssue ?? (networkAvailable ? nil : .offline)
+        let summary = issue.map { "Last observed issue\n" + $0.message + "\n\n" + $0.guidance } ?? "No specific failure has been recorded.\n\nIf access stops, check your internet connection and any network sign-in page. Retry Connect, or try another network. Failed access checks alone cannot identify censorship."
+        diagnostics = summary + "\n\nThese checks cover a few HTTPS destinations, not every website or application. TCP ports 80/443 are supported; UDP and QUIC bypass are not supported. Your public IP remains visible.\n\nNothing is uploaded automatically."
+    }
     func reviewDiagnostics() {
+        reportTitle = "Diagnostics"
         // Allowlist only; raw errors and system dictionaries are excluded.
         diagnostics = [
             "MoleDPI experimental diagnostics",
+            "Check category: " + (lastIssue?.rawValue ?? "none"),
             "State: " + String(describing: state),
             "Connection requested: " + String(wantsConnection),
             "Recovering: " + String(recovering),
@@ -128,7 +161,7 @@ import AppKit
         guard !quitting, reconnectTask == nil, state == .off, !recoveryNeeded else { return }
         wantsConnection = true
         holdConnectionActivity()
-        if !networkAvailable { recovering = true; return }
+        if !networkAvailable || sleeping { recovering = true; return }
         let timing = ConnectClock()
         timing.mark("ui.connect")
         sites = sites.map { SiteCheck(host: $0.host, name: $0.name) }
@@ -145,13 +178,13 @@ import AppKit
                 }
                 state = .on; detail = "The mole is underground. Tunnel ready!"
                 timing.mark("ui.connected")
-                recovering = false; attempt = 0
+                recovering = false; attempt = 0; completeFailures = 0; lastIssue = nil
                 issueMessage = nil
                 startMonitoring()
             } catch {
                 guard !Task.isCancelled else { return }
                 do { try await engine.stop() } catch { recoveryNeeded = true }
-                state = .off; detail = FriendlyError.message(error); issueMessage = detail
+                state = .off; lastIssue = error as? ConnectionIssue; detail = FriendlyError.message(error); issueMessage = detail
                 if error is HelperApprovalDenied { wantsConnection = false; recovering = false; releaseConnectionActivity() }
                 else { scheduleRecovery() }
             }
@@ -159,7 +192,6 @@ import AppKit
     }
     private func startMonitoring(immediate: Bool = false) {
         monitor = Task {
-        var completeFailures = 0
         var checkNow = immediate
         while !Task.isCancelled && wantsConnection && !quitting {
             if !checkNow {
@@ -167,17 +199,20 @@ import AppKit
             }
             checkNow = false
             guard !Task.isCancelled, wantsConnection, !quitting else { return }
-            guard networkAvailable else { recovering = true; continue }
+            guard networkAvailable, !sleeping else { recovering = true; continue }
+            let revision = networkRevision
             let results = await engine.health(targets: sites)
             guard !Task.isCancelled, wantsConnection, !quitting else { return }
-            guard let results else { issueMessage = "The network engine stopped. Reconnecting."; scheduleRecovery(); return }
+            guard revision == networkRevision, !sleeping, networkAvailable else { continue }
+            guard let results else { lastIssue = .localEngine; issueMessage = "The network engine stopped. Reconnecting."; scheduleRecovery(); return }
             sites = results
             // A single remote endpoint failure does not prove the
             // worker or the user's established connections are dead.
             if results.contains(where: { $0.reachable == true }) {
-                completeFailures = 0; recovering = false; issueMessage = nil
+                completeFailures = 0; recovering = false; issueMessage = nil; lastIssue = nil
             } else {
-                recovering = true; issueMessage = "Access checks failed. Retrying safely."; completeFailures += 1
+                lastIssue = ConnectionIssue.summarize(results)
+                recovering = true; issueMessage = lastIssue?.message; completeFailures += 1
                 if completeFailures >= 3 { scheduleRecovery(); return }
             }
         }
@@ -249,7 +284,7 @@ import AppKit
                 state = .off; detail = reason ?? "The mole is still above ground."
                 let callbacks = stopped; stopped.removeAll(); failed.removeAll(); callbacks.forEach { $0() }
             } catch {
-                recoveryNeeded = true; state = .off; detail = FriendlyError.message(error); issueMessage = detail
+                recoveryNeeded = true; state = .off; lastIssue = error as? ConnectionIssue; detail = FriendlyError.message(error); issueMessage = detail
                 let callbacks = failed; stopped.removeAll(); failed.removeAll(); callbacks.forEach { $0() }
             }
         }

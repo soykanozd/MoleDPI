@@ -260,20 +260,20 @@ struct Panel: View {
     private func diagnostics(_ report: String) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Diagnostics").font(.system(size: 20, weight: .semibold))
+                Text(model.reportTitle).font(.system(size: 20, weight: .semibold))
                 Spacer()
                 Button { model.diagnostics = nil } label: {
                     Image(systemName: "xmark").frame(width: 26, height: 28)
                 }.buttonStyle(.plain).accessibilityLabel("Back to About MoleDPI")
             }.frame(height: 52)
-            Text("Review before sharing. Nothing is sent automatically.")
+            Text(model.reportTitle == "Connection Help" ? "Guidance based on the last observed connection checks." : "Review before sharing. Nothing is sent automatically.")
                 .font(.system(size: 13)).foregroundStyle(MolePalette.secondary)
-            ScrollView { Text(report).font(.system(size: 12, design: .monospaced))
+            ScrollView { Text(report).font(.system(size: model.reportTitle == "Connection Help" ? 14 : 12, design: model.reportTitle == "Connection Help" ? .default : .monospaced))
                 .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
-            Button("Copy Report") {
+            if model.reportTitle == "Diagnostics" { Button("Copy Report") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(report, forType: .string)
-            }.padding(.bottom, 14)
+            }.padding(.bottom, 14) }
         }.padding(.horizontal, 18).padding(.top, 8)
     }
     private var about: some View {
@@ -299,6 +299,7 @@ struct Panel: View {
                     Text("The internet should be open to everyone.").bold()
                     Text("Experimental · Bugs and connection failures may occur.").font(.system(size: 12)).foregroundStyle(MolePalette.secondary)
                     UpdateControls(checker: model.updates)
+                    Button("Connection Help") { model.reviewConnectionHelp() }.buttonStyle(.plain)
                     Button("Review Diagnostics") { model.reviewDiagnostics() }.buttonStyle(.plain)
                     Text("MoleDPI · Free & Open Source")
                         .font(.system(size: 12)).foregroundStyle(MolePalette.secondary)
@@ -329,7 +330,7 @@ struct Panel: View {
             }.frame(height: 52)
             AnimatedMole(state: model.recovering ? .digging : model.state).frame(width: 218, height: 121).padding(.top, 30)
             HStack(spacing: 8) {
-                Circle().fill(model.state == .on ? MolePalette.green : model.state == .off ? MolePalette.red : .yellow)
+                Circle().fill(model.recovering ? .yellow : model.state == .on ? MolePalette.green : model.state == .off ? MolePalette.red : .yellow)
                     .frame(width: 13, height: 13)
                 Text(title).font(.system(size: 16, weight: .semibold)).lineLimit(1)
             }
