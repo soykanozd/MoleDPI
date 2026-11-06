@@ -20,13 +20,14 @@ Dependencies are downloaded as source into the disposable `.build/udp-lab` direc
 
 ```sh
 python3 Experimental/UDP/physical_test.py
+python3 Experimental/UDP/physical_test.py --ipv6
 ```
 
-This separate test requests administrator authorization and creates a real temporary utun plus a dedicated PF anchor. Its rule matches **only the current user's UDP to this Mac's assigned IPv4 address and one test port**. It does not capture arbitrary applications or internet destinations. No default route, DNS/proxy preference, installed app/helper, global PF ruleset or sudoers entry is changed. Rules create no PF states, so cleanup does not flush other applications' states. Only the test's PF enable reference is released.
+This separate test requests administrator authorization and creates a real temporary utun plus a dedicated PF anchor. Its rule matches **only the current user's UDP to this Mac's assigned local address and one test port**. It does not capture arbitrary applications or internet destinations. No default route, DNS/proxy preference, installed app/helper, global PF ruleset or sudoers entry is changed. Rules create no PF states, so cleanup does not flush other applications' states. Only the test's PF enable reference is released.
 
 Generated binaries are first copied out of protected Documents storage, then hash-verified in a root-private staging directory. The supervisor watches caller/worker liveness. A separate root launcher invokes journal-based recovery if the supervisor itself is killed; recovery verifies root ownership, the session UUID and executable paths before stopping owned processes. Recovery artifacts are retained on failure rather than silently discarded. The test is narrow development code, not a reviewed production privileged API.
 
-Normal stop, engine crash, tunnel crash, caller loss, a real certificate-pinned QUIC session and supervisor crash/recovery all passed. Each scenario verified positive PF counters and matching PF file, proxy/DNS snapshots and interface inventory after cleanup. Both the controlled filter and QUIC endpoint run on this Mac. **These are real OS packet-routing tests, not real ISP censorship tests.** Physical IPv6 capture remains unverified.
+Normal stop, engine crash, tunnel crash, caller loss, a real certificate-pinned QUIC session and supervisor crash/recovery all passed. Each scenario verified positive PF counters and matching PF file, proxy/DNS snapshots and interface inventory after cleanup. Both the controlled filter and QUIC endpoint run on this Mac. **These are real OS packet-routing tests, not real ISP censorship tests.** The same six scenarios also passed with native IPv6 physical capture, using a link-local gateway scoped to the temporary interface.
 
 ## What passed
 
@@ -42,7 +43,7 @@ The lab's fake TTL is **1**, intentionally limited to the test. It is not a prod
 
 - No system-wide packet interception or app integration has been implemented.
 - Physical macOS IPv4 utun/PF routing and the narrow lab crash recovery are tested. General application routing and integration with the installed privileged service remain incomplete.
-- Native IPv6 packet-pipeline UDP/QUIC tests passed. The earlier IPv4-mapped fixture was replaced with a valid native assigned IPv6 endpoint; physical IPv6 PF/utun routing remains unverified.
+- Native IPv6 packet-pipeline UDP/QUIC tests passed. The earlier IPv4-mapped fixture was replaced with a valid native assigned IPv6 endpoint; physical IPv6 PF/utun routing passed the six narrow test scenarios too.
 - No real ISP censorship test was available: the user reports existing voice, game and screen-sharing functions already work. Those sessions were not instrumented.
 - Remote QUIC/HTTP3, MTU/fragmentation behavior, concurrent load and long-duration stability remain unverified.
 

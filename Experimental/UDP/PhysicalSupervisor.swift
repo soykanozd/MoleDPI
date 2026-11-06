@@ -33,17 +33,17 @@ func run(_ exe: String, _ args: [String], input: String? = nil) throws -> (Int32
     guard drained.wait(timeout: .now() + 1) == .success else { throw LabFailure(stage: "output-timeout") }
     return (p.terminationStatus, String(decoding: output.data, as: UTF8.self))
 }
-func assignedIPv4(_ address: String) -> Bool {
+func assignedLocal(_ address: String) -> Bool {
     var list: UnsafeMutablePointer<ifaddrs>?
     guard getifaddrs(&list) == 0, let first = list else { return false }
     defer { freeifaddrs(first) }
     var next: UnsafeMutablePointer<ifaddrs>? = first
     while let item = next {
         defer { next = item.pointee.ifa_next }
-        guard let addr = item.pointee.ifa_addr, addr.pointee.sa_family == AF_INET else { continue }
+        guard let addr = item.pointee.ifa_addr, [UInt8(AF_INET), UInt8(AF_INET6)].contains(addr.pointee.sa_family) else { continue }
         var text = [CChar](repeating: 0, count: Int(NI_MAXHOST))
         if getnameinfo(addr, socklen_t(addr.pointee.sa_len), &text, socklen_t(text.count), nil, 0, NI_NUMERICHOST) == 0,
-           String(cString: text) == address, !address.hasPrefix("127.") { return true }
+           String(cString: text) == address, !address.hasPrefix("127."), address != "::1", !address.hasPrefix("fe80:") { return true }
     }
     return false
 }
@@ -109,8 +109,10 @@ func assignedIPv4(_ address: String) -> Bool {
         let args = CommandLine.arguments
         guard geteuid() == 0, args.count == 9, let uid = UInt32(args[1]), uid >= 500,
               let owner = Int32(args[2]), owner > 1, let client = Int32(args[3]), client > 1,
-              assignedIPv4(args[4]), let port = UInt16(args[5]), port >= 1024,
+              assignedLocal(args[4]), let port = UInt16(args[5]), port >= 1024,
               let uuid = UUID(uuidString: args[6]) else { throw LabFailure(stage: "invalid-request") }
+        let ipv6 = args[4].contains(":")
+        let gateway = ipv6 ? "fe80::1" : "198.19.255.254"
         let nonce = uuid.uuidString, control = args[7], mode = args[8]
         guard ["normal", "crash-engine", "crash-tunnel", "caller-loss", "quic", "crash-supervisor"].contains(mode) else { throw LabFailure(stage: "invalid-mode") }
         for pid in [owner,client] {
@@ -213,11 +215,14 @@ func assignedIPv4(_ address: String) -> Bool {
             guard global.0 == 0, global.1.contains("anchor \"com.apple/*\"") else { throw LabFailure(stage:"anchor-unavailable") }
             let selected = (200...239).map { "utun" + String($0) }.first { if_nametoindex($0) == 0 }
             guard let selected else { throw LabFailure(stage:"no-free-interface") }
-            let existingRoute = try run("/sbin/route",["-n","get","198.19.255.254"])
-            guard existingRoute.0 == 0,
-                  existingRoute.1.range(of:#"destination:\s*default"#,options:.regularExpression) != nil else {
+            if !ipv6 {
+            let existingRoute = try run("/sbin/route",["-n","get"] + (ipv6 ? ["-inet6"] : []) + [gateway])
+            guard (ipv6 && existingRoute.0 != 0) || (existingRoute.0 == 0 &&
+                  existingRoute.1.range(of:#"destination:\s*default"#,options:.regularExpression) != nil) else {
                 throw LabFailure(stage:"test-address-route-conflict")
             }
+            }
+            // IPv6 uses a link-local gateway scoped to the new interface only.
             // Fixed loopback SOCKS port. An occupied port fails closed.
             engine.executableURL = resources.appendingPathComponent("ciadpi")
             engine.arguments = ["--ip","127.0.0.1","--port","19084","--max-conn","32","--proto","udp","--udp-fake","1","--ttl","1","--fake-data",":MOLEDPI_PHYSICAL_LAB_FAKE"]
@@ -229,7 +234,8 @@ func assignedIPv4(_ address: String) -> Bool {
                 Thread.sleep(forTimeInterval:0.02)
             }
             let config = resources.appendingPathComponent(nonce + ".yml")
-            let text = "tunnel:\n  name: \(selected)\n  mtu: 1500\n  ipv4: 198.19.255.254\nsocks5:\n  address: 127.0.0.1\n  port: 19084\n  udp: udp\nmisc:\n  max-session-count: 32\n  log-level: error\n  udp-read-write-timeout: 2000\n"
+            let addressLine = ipv6 ? "ipv6: \"\(gateway)\"" : "ipv4: \(gateway)"
+            let text = "tunnel:\n  name: \(selected)\n  mtu: 1500\n  \(addressLine)\nsocks5:\n  address: 127.0.0.1\n  port: 19084\n  udp: udp\nmisc:\n  max-session-count: 32\n  log-level: error\n  udp-read-write-timeout: 2000\n"
             try Data(text.utf8).write(to:config,options:.atomic); chmod(config.path,0o600)
             tunnel.executableURL = resources.appendingPathComponent("tunnel-runner"); tunnel.arguments = [config.path,"--physical"]
             tunnel.standardOutput = FileHandle.nullDevice; tunnel.standardError = FileHandle.nullDevice; tunnel.standardInput = FileHandle.nullDevice
@@ -240,7 +246,7 @@ func assignedIPv4(_ address: String) -> Bool {
                 Thread.sleep(forTimeInterval:0.02)
             }
             device = selected
-            let rules = "pass out quick route-to (\(selected) 198.19.255.254) inet proto udp from any to \(args[4]) port \(port) user \(uid) no state\n"
+            let rules = "pass out quick route-to (\(selected) \(gateway)) \(ipv6 ? "inet6" : "inet") proto udp from any to \(args[4]) port \(port) user \(uid) no state\n"
             guard try run("/sbin/pfctl",["-n","-a",name,"-f","-"],input:rules).0 == 0 else { throw LabFailure(stage:"rule-syntax") }
             let enabled = try run("/sbin/pfctl",["-E"])
             guard enabled.0 == 0, let match = enabled.1.range(of:#"Token\s*:\s*([0-9]+)"#,options:.regularExpression) else { throw LabFailure(stage:"pf-reference") }

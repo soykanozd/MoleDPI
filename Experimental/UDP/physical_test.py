@@ -17,7 +17,7 @@ import tempfile
 import threading
 import time
 import uuid
-from pipeline_test import BUILD, LOCAL
+from pipeline_test import BUILD, LOCAL, LOCAL6
 from quic_test import openssl
 
 FAKE=b'MOLEDPI_PHYSICAL_LAB_FAKE'
@@ -34,12 +34,16 @@ def apple_string(value):
     return '"'+value.replace('\\','\\\\').replace('"','\\"').replace('\n','\\n')+'"'
 
 def main():
+    use_v6 = "--ipv6" in __import__("sys").argv
+    if use_v6 and not LOCAL6: raise RuntimeError("No assigned native IPv6 endpoint")
+    destination = LOCAL6 if use_v6 else LOCAL
+    family = socket.AF_INET6 if use_v6 else socket.AF_INET
     before=configuration()
     uid=os.getuid()
     assert uid>=500 and os.geteuid()!=0, 'Start as the normal signed-in user'
     clients=[]; launcher=None; quic_server=None
-    with tempfile.TemporaryDirectory(prefix='moledpi-physical-',dir='/private/tmp') as temporary, socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as endpoint:
-        folder=Path(temporary); endpoint.bind((LOCAL,0));endpoint.settimeout(.1)
+    with tempfile.TemporaryDirectory(prefix='moledpi-physical-',dir='/private/tmp') as temporary, socket.socket(family,socket.SOCK_DGRAM) as endpoint:
+        folder=Path(temporary); endpoint.bind((destination,0));endpoint.settimeout(.1)
         finished=threading.Event()
         token=b'LAB-'+os.urandom(24)
         passed=set()
@@ -53,7 +57,7 @@ def main():
         openssl('req','-x509','-newkey','rsa:2048','-nodes','-keyout',folder/'key.pem','-out',folder/'cert.pem','-subj','/CN=localhost','-days','1')
         openssl('x509','-in',folder/'cert.pem','-outform','DER','-out',folder/'cert.der')
         openssl('pkcs12','-export','-inkey',folder/'key.pem','-in',folder/'cert.pem','-out',folder/'identity.p12','-passout','pass:local-test')
-        quic_server=subprocess.Popen([str(BUILD/'quic-fixture'),'server',str(folder/'identity.p12'),LOCAL],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True)
+        quic_server=subprocess.Popen([str(BUILD/'quic-fixture'),'server',str(folder/'identity.p12'),destination],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True)
         assert select.select([quic_server.stdout],[],[],5)[0], 'QUIC fixture startup timed out'
         ready=quic_server.stdout.readline().strip()
         assert ready.startswith('READY '), 'QUIC fixture identity failed'
@@ -80,7 +84,7 @@ def main():
                        '[ "$(/usr/bin/shasum -a 256 "$stage/'+name+'" | /usr/bin/cut -d\' \' -f1)" = '+q(digest)+' ]']
         for mode,client,nonce,control,target_port in sessions:
             # Every value is separately shell-quoted; the root executable validates them.
-            argv=[str(uid),str(os.getpid()),str(client.pid),LOCAL,str(target_port),nonce,str(control),mode]
+            argv=[str(uid),str(os.getpid()),str(client.pid),destination,str(target_port),nonce,str(control),mode]
             command='"$stage/physical-supervisor" '+' '.join(q(value) for value in argv)
             if mode=='crash-supervisor':
                 script += ['if '+command+'; then exit 90; else "$stage/physical-supervisor" --recover '+q(nonce)+'; fi']
@@ -89,7 +93,7 @@ def main():
         script += ['complete=1']
         root_script='\n'.join(script)
         try:
-            with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as direct:
+            with socket.socket(family,socket.SOCK_DGRAM) as direct:
                 direct.settimeout(.15);direct.connect(endpoint.getsockname());direct.send(token)
                 try: direct.recv(2048)
                 except socket.timeout: pass
@@ -116,10 +120,10 @@ def main():
                 else: raise AssertionError('Physical startup/authorization timed out')
                 assert value.get('phase')=='active', 'Physical setup failed: '+str(value.get('problem','unknown'))
                 if mode=='quic':
-                    result=subprocess.run([str(BUILD/'quic-fixture'),'client',str(target_port),str(folder/'cert.der'),LOCAL],capture_output=True,text=True,timeout=18)
+                    result=subprocess.run([str(BUILD/'quic-fixture'),'client',str(target_port),str(folder/'cert.der'),destination],capture_output=True,text=True,timeout=18)
                     assert result.returncode==0 and result.stdout.startswith('PASS real QUIC'), 'Physical certificate-pinned QUIC handshake failed'
                 else:
-                    with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as probe:
+                    with socket.socket(family,socket.SOCK_DGRAM) as probe:
                         probe.connect(endpoint.getsockname());probe.settimeout(.2)
                         end=time.monotonic()+5;received=False
                         while time.monotonic()<end:

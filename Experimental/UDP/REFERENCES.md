@@ -12,3 +12,7 @@ Relevant lessons:
 - A system SOCKS preference can be ignored by applications. Real packet-capture tests remain necessary; global proxy/DNS changes are not used by the UDP lab.
 
 The repository declares Apache-2.0. No implementation code, binaries, shell scripts or configuration recipes were copied from it. It is an architectural/build reference; the actual lab engines retain their separate pinned revisions and notices listed in UPSTREAM.md. MoleDPI's working TCP engine is unchanged.
+
+## SplitWire-Turkey
+
+[SplitWire-Turkey](https://github.com/cagritaskn/SplitWire-Turkey) is a Windows automation project combining several backends. Its README describes local ByeDPI/zapret methods separately from WireSock/WARP tunnelling. Its QUIC blockcheck script tries fake-packet and fragmentation variants; those packet-driver strategies are not directly portable to macOS. Its top-level license is MIT; bundled engines have their own notices. No code or binaries were copied. The applicable design lesson is measured strategy selection and separate verification of each transport, rather than claiming all backends are equivalent. No WARP account, remote tunnel or Windows driver is added to MoleDPI.
