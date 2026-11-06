@@ -1,11 +1,9 @@
-# MoleDPI v1.1.0-beta — Experimental QUIC Integration
+# MoleDPI v1.1.1-beta — TCP Fallback and Reviewed Reports
 
-**Experimental. Bugs, disconnections and interruptions may occur. Not Apple-notarized.**
+**Experimental; bugs and interruptions remain possible. Ad-hoc signed, not Apple-notarized.**
 
-Connect now includes source-built local UDP/443 routing on IPv4/IPv6, alongside the existing TCP engine. ByeDPI adds fake packets only for plausible QUIC v1/v2 Initial datagrams; other UDP/443 is relayed unchanged and all other UDP ports remain direct. The proxy runs as nobody; the restricted root helper owns the temporary PF anchor and utun. No remote server, subscription or paid API is used.
+- QUIC startup failure or worker exit now triggers verified UDP cleanup while preserving the working TCP engine. Cleanup failure still fails closed. The panel explicitly identifies TCP fallback; diagnostics record actual QUIC status.
+- **? → Report a Problem** opens reviewed diagnostics with **Copy Report** and **Open GitHub Issue**. The issue template is blank; no diagnostic content is transmitted or appended to the link.
+- The compact panel, mole artwork, normal Connect/Disconnect/Quit and permission model are preserved. Changed builds may require one helper approval; repeated connections reuse that approved build.
 
-Disconnect and Quit remove routing before stopping the owned engines. Independent recovery is included for unexpected worker exit. The panel and mole artwork are unchanged.
-
-Apple Silicon, macOS 13 deployment target; verified locally on a recent macOS only. Quit the old app, open MoleDPI.dmg and drag MoleDPI into Applications. Approve the updated helper if macOS asks. Do not disable Gatekeeper. For advanced TCP-only fallback, Quit and launch `open -a MoleDPI --args --tcp-only`.
-
-Scope: public UDP/443 only. This is not general UDP censorship bypass or anonymity. TTL 8 is not calibrated to every ISP. A real QUIC handshake with system TLS verification is a transport test, not proof of bypassing a blocked ISP path. Full HTTP/3 application compatibility, long-term stability, clean-Mac installation and independent security review remain unverified. See RELEASE-TESTS.md for actual validation.
+Apple Silicon, macOS 13 deployment target; broad older-OS compatibility is unverified. Disconnect and Quit before replacing the app in Applications. This remains experimental public UDP/443 QUIC processing; other UDP ports remain direct, public IP is visible and ISP bypass/HTTP3 compatibility is not guaranteed. No server, subscription or paid API is added.

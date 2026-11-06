@@ -10,6 +10,7 @@ import AppKit
     @Published var detail = "The mole is still above ground."
     @Published var sites: [SiteCheck]
     @Published var showDetails = false
+    @Published var quicActive: Bool?
     @Published var diagnostics: String?
     @Published var reportTitle = "Diagnostics"
     private var lastIssue: ConnectionIssue?
@@ -147,10 +148,13 @@ import AppKit
         // Allowlist only; raw errors and system dictionaries are excluded.
         diagnostics = [
             "MoleDPI experimental diagnostics",
+            "Version: " + (Bundle.main.object(forInfoDictionaryKey:"MoleReleaseTag") as? String ?? "source-build"),
+            "macOS: " + [ProcessInfo.processInfo.operatingSystemVersion.majorVersion, ProcessInfo.processInfo.operatingSystemVersion.minorVersion, ProcessInfo.processInfo.operatingSystemVersion.patchVersion].map(String.init).joined(separator:"."),
             "Check category: " + (lastIssue?.rawValue ?? "none"),
             "State: " + String(describing: state),
             "Connection requested: " + String(wantsConnection),
-            "UDP/443 requested: " + String(engine.requestsQUIC),
+            "UDP/443 configured: " + String(engine.requestsQUIC),
+            "QUIC routing active: " + (state == .on ? (quicActive.map(String.init) ?? "not verified") : (state == .off && !recoveryNeeded ? "false" : "not verified")),
             "Recovering: " + String(recovering),
             "Cleanup required: " + String(recoveryNeeded),
             "Verified targets: " + String(sites.filter { $0.reachable == true }.count) + "/" + String(sites.count),
@@ -174,6 +178,8 @@ import AppKit
                 let checked = try await engine.start(targets: sites)
                 guard !Task.isCancelled else { return }
                 sites = checked
+                quicActive = await engine.quicStatus()
+                guard !Task.isCancelled, wantsConnection, !quitting, state == .digging else { return }
                 guard !checked.isEmpty, checked.allSatisfy({ $0.reachable == true }) else {
                     throw RoutingError.message("Connection could not be verified.")
                 }
@@ -207,6 +213,8 @@ import AppKit
             guard revision == networkRevision, !sleeping, networkAvailable else { continue }
             guard let results else { lastIssue = .localEngine; issueMessage = "The network engine stopped. Reconnecting."; scheduleRecovery(); return }
             sites = results
+            quicActive = await engine.quicStatus()
+            guard !Task.isCancelled, wantsConnection, !quitting else { return }
             // A single remote endpoint failure does not prove the
             // worker or the user's established connections are dead.
             if results.contains(where: { $0.reachable == true }) {

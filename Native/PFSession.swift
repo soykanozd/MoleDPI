@@ -149,18 +149,8 @@ final class SignalFlag: @unchecked Sendable {
         defer { sources.forEach { $0.cancel() } }
         var dnsStore: SCDynamicStore?
         let dnsKey = "State:/Network/Service/MoleDPI-" + tokenString + "/DNS"
-        func clean() -> Bool {
+        func stopUDP() -> Bool {
             var ok = true
-            if let store = dnsStore {
-                if !SCDynamicStoreRemoveValue(store, dnsKey as CFString) && SCError() != kSCStatusNoKey { ok = false }
-                dnsStore = nil
-            }
-            if loaded {
-                do {
-                    let result = try command(pfctl, ["-a", name, "-f", "-"], input: "")
-                    ok = result.code == 0
-                } catch { ok = false }
-            }
             if udp.isRunning {
                 udp.terminate()
                 let deadline = Date().addingTimeInterval(4)
@@ -172,6 +162,21 @@ final class SignalFlag: @unchecked Sendable {
                 catch { ok = false }
             }
             udpReady = false
+            return ok
+        }
+        func clean() -> Bool {
+            var ok = true
+            if let store = dnsStore {
+                if !SCDynamicStoreRemoveValue(store, dnsKey as CFString) && SCError() != kSCStatusNoKey { ok = false }
+                dnsStore = nil
+            }
+            if loaded {
+                do {
+                    let result = try command(pfctl, ["-a", name, "-f", "-"], input: "")
+                    ok = ok && result.code == 0
+                } catch { ok = false }
+            }
+            if !stopUDP() { ok = false }
             if engine.isRunning {
                 engine.terminate()
                 let deadline = Date().addingTimeInterval(2)
@@ -237,6 +242,7 @@ final class SignalFlag: @unchecked Sendable {
                 dnsStore = store
             }
             if profile >= 6 {
+                do {
                 udp.executableURL = URL(fileURLWithPath:privilegedDirectory+"/moledpi-udp")
                 udp.arguments = [String(uid),String(parent),String(getpid()),"internet","443",tokenString,heartbeat,"session"]
                 udp.standardInput = FileHandle.nullDevice; udp.standardOutput = FileHandle.nullDevice; udp.standardError = FileHandle.nullDevice
@@ -247,13 +253,21 @@ final class SignalFlag: @unchecked Sendable {
                     if let data = try? Data(contentsOf:file), let object = try? JSONSerialization.jsonObject(with:data) as? [String:Any], object["phase"] as? String == "active" { udpReady = true; break }
                     Thread.sleep(forTimeInterval:0.03)
                 }
-                guard udpReady else { throw Failure(message:"Experimental UDP engine failed to start. Restoring network settings.") }
+                guard udpReady else { throw Failure(message:"Experimental UDP engine did not become ready.") }
+                } catch {
+                    guard stopUDP() else { throw Failure(message:"QUIC cleanup failed; TCP fallback is unsafe.") }
+                }
             }
+
             mark("apply")
             status("active", token: pfToken)
             let startupWindow = DispatchTime.now() + .seconds(4)
             var iteration = 0
-            while alive() && !signals.stopped && engine.isRunning && (profile < 6 || udp.isRunning) {
+            while alive() && !signals.stopped && engine.isRunning {
+                if udpReady && !udp.isRunning {
+                    guard stopUDP() else { throw Failure(message:"QUIC cleanup failed; TCP fallback is unsafe.") }
+                    status("active", token:pfToken)
+                }
                 let needsInitialCount = packetCount == 0 && DispatchTime.now() < startupWindow
                 if iteration % 4 == 0 || needsInitialCount {
                     let info = try command(pfctl, ["-s", "info"])
@@ -270,7 +284,7 @@ final class SignalFlag: @unchecked Sendable {
                 }
                 iteration += 1; Thread.sleep(forTimeInterval: needsInitialCount ? 0.12 : 0.5)
             }
-            let engineFailed = alive() && !signals.stopped && (!engine.isRunning || (profile >= 6 && !udp.isRunning))
+            let engineFailed = alive() && !signals.stopped && !engine.isRunning
             if clean() { status(engineFailed ? "failed" : "stopped", engineFailed ? "The network engine stopped unexpectedly." : "") }
             else { status("cleanup_failed", "PF cleanup failed. Recovery is required.", token: pfToken) }
         } catch {

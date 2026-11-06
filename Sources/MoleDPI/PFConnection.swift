@@ -24,6 +24,7 @@ struct SiteCheck: Identifiable, Sendable {
 }
 protocol ConnectionEngine: Sendable {
     var requestsQUIC: Bool { get }
+    func quicStatus() async -> Bool?
     func start(targets: [SiteCheck]) async throws -> [SiteCheck]
     func health(targets: [SiteCheck]) async -> [SiteCheck]?
     func stop() async throws
@@ -31,6 +32,7 @@ protocol ConnectionEngine: Sendable {
 }
 extension ConnectionEngine {
     var requestsQUIC: Bool { false }
+    func quicStatus() async -> Bool? { nil }
     func shutdown() async throws { try await stop() }
 }
 // Manages a source-built tpws probe and an ephemeral privileged PF session.
@@ -264,6 +266,7 @@ actor PFConnection: ConnectionEngine {
             throw error
         }
     }
+    func quicStatus() -> Bool? { requestsQUIC ? readStatus()?["udpActive"] as? Bool : nil }
     func sessionStatusForTesting() -> URL? { statusURL }
     private func workerIsHealthy() -> Bool {
         guard service != nil, let status = readStatus(), status["phase"] as? String == "active",

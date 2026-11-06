@@ -69,7 +69,7 @@ enum NetworkVerification {
             queue.asyncAfter(deadline:.now()+8) { finish(false) }
         }
     }
-    @MainActor static func run(encryptedDNS: Bool = false) async -> Int32 {
+    @MainActor static func run(encryptedDNS: Bool = false, fallback: Bool = false) async -> Int32 {
         let engine = PFConnection(requireDNSRecovery: encryptedDNS)
         let targets = ["example.com", "discord.com", "www.roblox.com"].map { SiteCheck(host: $0, name: $0) }
         do {
@@ -77,7 +77,7 @@ enum NetworkVerification {
             let proxy = SCDynamicStoreCopyProxies(nil) as NSDictionary?
             _ = try await ServiceClient.prepare()
             let model = Model(engine: engine, sites: targets)
-            for cycle in 1...(encryptedDNS ? 2 : 10) {
+            for cycle in 1...((encryptedDNS || fallback) ? 2 : 10) {
                 model.connect()
                 await model.task?.value
                 guard model.state == .on else { throw RoutingError.message(model.detail) }
@@ -85,8 +85,8 @@ enum NetworkVerification {
                 let status = await engine.sessionStatusForTesting()
                 if engine.requestsQUIC, let status,
                    let active = try JSONSerialization.jsonObject(with:Data(contentsOf:status)) as? [String:Any] {
-                    guard active["udpActive"] as? Bool == true else { throw RoutingError.message("UDP helper was not active.") }
-                    if cycle == 1 {
+                    guard active["udpActive"] as? Bool == !fallback else { throw RoutingError.message("UDP helper was not active.") }
+                    if cycle == 1 && !fallback {
                         let handshake = await quicHandshake()
                         print(handshake ? "PASS: real public QUIC handshake with system certificate verification" : "OBSERVATION: public QUIC handshake failed; ISP bypass is unverified")
                         fflush(stdout)
@@ -103,6 +103,7 @@ enum NetworkVerification {
                         }
                     }
                 }
+                if fallback { guard model.quicActive == false else { throw RoutingError.message("Fallback state was not shown.") }; print("PASS: TCP stayed verified while QUIC was unavailable") }
                 model.disconnect()
                 await model.task?.value
                 guard model.state == .off && !model.recoveryNeeded else { throw RoutingError.message(model.detail) }

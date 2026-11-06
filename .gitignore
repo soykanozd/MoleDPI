@@ -10,3 +10,5 @@ __pycache__/
 vendor/byedpi/ciadpi
 vendor/hev/bin/
 vendor/hev/build/
+
+previews/

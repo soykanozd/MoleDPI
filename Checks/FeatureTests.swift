@@ -14,6 +14,25 @@ import Foundation
    try expect(FriendlyError.message(HelperApprovalDenied()).contains("Permission"),"permission guidance")
    let secret=FriendlyError.message(RoutingError.message("token=secret /private/fixture 192.0.2.1"))
    try expect(!secret.contains("secret") && !secret.contains("192.0.2.1"),"friendly error excludes raw data")
+   let fallback=Model(engine:FallbackFixture(),monitorNetwork:false)
+   fallback.connect();await fallback.task?.value
+   try expect(fallback.state == .on && fallback.quicActive == false,"verified TCP fallback remains connected")
+   fallback.reviewDiagnostics()
+   try expect(fallback.diagnostics?.contains("QUIC routing active: false")==true,"report accurately identifies QUIC fallback")
+   fallback.disconnect();await fallback.task?.value
+   fallback.quicActive=true
+   fallback.reviewDiagnostics()
+   try expect(fallback.diagnostics?.contains("QUIC routing active: false")==true,"disconnected report cannot claim stale QUIC activity")
+   let gate=QUICGateFixture()
+   let controlled=Model(engine:gate,monitorNetwork:false)
+   var states:[Model.State]=[]
+   let observation=controlled.$state.sink { states.append($0) }
+   controlled.connect()
+   for _ in 0..<500 { if await gate.waiting { break }; try await Task.sleep(nanoseconds:2_000_000) }
+   try expect(await gate.waiting,"status retrieval reached cancellation gate")
+   controlled.disconnect();await controlled.task?.value
+   try expect(controlled.state == .off && !states.contains(.on),"disconnect during QUIC status cannot publish Connected")
+   observation.cancel()
    let e=Counting()
    let m=Model(engine:e, monitorNetwork:false, healthInterval:30_000_000_000)
    m.connect(); await m.task?.value
@@ -32,4 +51,21 @@ actor Counting: ConnectionEngine {
  func start(targets:[SiteCheck])->[SiteCheck] { starts+=1;return targets.map{var s=$0;s.reachable=true;return s} }
  func health(targets:[SiteCheck])->[SiteCheck]? { checks+=1;return targets.map{var s=$0;s.reachable=true;return s} }
  func stop(){}
+}
+
+actor FallbackFixture: ConnectionEngine {
+ nonisolated let requestsQUIC=true
+ func quicStatus()->Bool? { false }
+ func start(targets:[SiteCheck])->[SiteCheck] { targets.map{var s=$0;s.reachable=true;return s} }
+ func health(targets:[SiteCheck])->[SiteCheck]? { targets }
+ func stop(){}
+}
+
+actor QUICGateFixture: ConnectionEngine {
+ var pending:CheckedContinuation<Bool?,Never>?
+ var waiting:Bool { pending != nil }
+ func start(targets:[SiteCheck])->[SiteCheck] { targets.map{var s=$0;s.reachable=true;return s} }
+ func quicStatus() async -> Bool? { await withCheckedContinuation { pending=$0 } }
+ func health(targets:[SiteCheck])->[SiteCheck]? { targets }
+ func stop() { let current=pending;pending=nil;current?.resume(returning:false) }
 }

@@ -21,6 +21,9 @@ import Combine
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let arguments = Array(CommandLine.arguments.dropFirst())
+        if arguments == ["--verify-tcp-fallback"] {
+            Task { exit(await NetworkVerification.run(fallback:true)) }; return
+        }
         if arguments == ["--verify-network-recovery"] {
             Task { exit(await NetworkVerification.recovery()) }
             return

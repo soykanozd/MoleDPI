@@ -228,7 +228,7 @@ struct Panel: View {
         switch model.state {
         case .off: return hasError ? (model.issueMessage ?? "Connection failed. Please try again.") : "The mole is still above ground."
         case .digging: return "The mole is digging its way..."
-        case .on: return "You're now underground."
+        case .on: return model.quicActive == false ? "Connected using TCP. QUIC is unavailable." : "You're now underground."
         case .emerging: return "The mole is returning above ground."
         }
     }
@@ -273,7 +273,12 @@ struct Panel: View {
             if model.reportTitle == "Diagnostics" { Button("Copy Report") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(report, forType: .string)
-            }.padding(.bottom, 14) }
+            }
+                Button("Open GitHub Issue") {
+                    NSWorkspace.shared.open(URL(string:"https://github.com/soykanozd/MoleDPI/issues/new?template=bug_report.yml")!)
+                }.buttonStyle(.plain).accessibilityHint("Opens a blank bug report. Paste only the diagnostics you reviewed.")
+                Text("Copy the reviewed report and paste it into the issue yourself.").font(.system(size:11)).foregroundStyle(MolePalette.secondary)
+            }
         }.padding(.horizontal, 18).padding(.top, 8)
     }
     private var about: some View {
@@ -301,6 +306,7 @@ struct Panel: View {
                     UpdateControls(checker: model.updates)
                     Button("Connection Help") { model.reviewConnectionHelp() }.buttonStyle(.plain)
                     Button("Review Diagnostics") { model.reviewDiagnostics() }.buttonStyle(.plain)
+                    Button("Report a Problem") { model.reviewDiagnostics() }.buttonStyle(.plain)
                     Text("MoleDPI · Free & Open Source")
                         .font(.system(size: 12)).foregroundStyle(MolePalette.secondary)
                 }

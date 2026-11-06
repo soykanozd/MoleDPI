@@ -22,7 +22,7 @@ A free, open-source macOS menu-bar application for trying local DPI circumventio
 - HTTPS verification, controlled reconnection and connection-help guidance.
 - General-purpose TCP 80/443 processing. Experimental QUIC Initial fake-packet processing covers public UDP/443. Other UDP remains direct; anonymity is not provided.
 
-**QUIC beta:** [v1.1.0-beta download](https://github.com/soykanozd/MoleDPI/releases/download/v1.1.0-beta/MoleDPI.dmg) · [Beta notes](https://github.com/soykanozd/MoleDPI/releases/tag/v1.1.0-beta). Experimental public UDP/443 support; other UDP stays direct.
+**QUIC beta:** [v1.1.1-beta download](https://github.com/soykanozd/MoleDPI/releases/download/v1.1.1-beta/MoleDPI.dmg) · [Beta notes](https://github.com/soykanozd/MoleDPI/releases/tag/v1.1.1-beta). Experimental public UDP/443 support; other UDP stays direct.
 
 ## Download and install
 
@@ -115,9 +115,14 @@ Reproducible bug reports, sanitized compatibility results, documentation improve
 
 If MoleDPI is useful to you, a GitHub star or sharing the repository link can help others discover it. Please keep the experimental status and support limitations alongside any recommendation.
 
-## Experimental UDP/443 integration (v1.1.0-beta)
+## Experimental UDP/443 integration (v1.1.1-beta)
 Connect now starts source-built ByeDPI and a local HEV utun alongside the existing TCP engine. Only this user's public UDP/443 is routed through it. Fake packets are restricted to plausible QUIC v1/v2 Initial packets; unknown UDP/443 payloads are relayed without fake injection. The proxy drops to the nobody account. Private/LAN destinations, other users and other UDP ports are excluded. No remote VPN server, paid API or login is used. Default routes and DNS preferences are preserved.
 
 The backend is joined on Disconnect/Quit; independent journal-based recovery handles worker loss. The fixed fake TTL is 8, not an ISP-calibrated strategy. A successful QUIC handshake proves transport operation, not that a real block was bypassed. HTTP/3 application semantics and universal game/voice access are not certified.
 
 For an advanced TCP-only fallback, Quit first, then launch `open -a MoleDPI --args --tcp-only`. The ordinary panel is unchanged. Installing a changed ad-hoc build may require one helper approval. This beta is not Apple-notarized.
+
+### Automatic TCP fallback and issue reports
+If the QUIC backend cannot start or exits, MoleDPI first verifies its cleanup and keeps the TCP session running. Failed cleanup still stops the session rather than pretending fallback is safe. When connected with QUIC unavailable, the panel says **Connected using TCP. QUIC is unavailable.**
+
+Use **? → Report a Problem** to review the allowlisted diagnostics, choose **Copy Report**, then **Open GitHub Issue**. The browser opens a blank issue template; no report content is included in the URL or sent automatically. Paste only the information you choose to share. Reports include app/macOS version and transport state, never IPs, private paths, browsing history or raw errors.
