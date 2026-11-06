@@ -29,3 +29,6 @@ ByeDPI Android, onun MIT lisanslı ByeDPI C alt modülü ve hev-socks5-tunnel ka
 Kaynak/ikili dağıtırken MoleDPI'ın ilgili tam kaynak kodunu, derleme betiklerini, bu bildirimleri ve upstream lisanslarını koru. Bu arşiv kaynakları ve paketleme betiklerini birlikte sunar; uygulama paketinde de lisans dosyaları bulunur.
 
 epoll-shim uyumluluk kodu için Jan Kokemüller’in MIT bildirimi de pakete eklenmiştir (jiixyj/epoll-shim, lisans karşılaştırması 18159584bb3d17e601b9315a7398ace018251bdc). Bu kimlik lisansın alındığı kaynaktır; zapret içindeki eski uyarlamanın birebir revizyonu olarak kullanılmaz. uthash BSD-1-Clause, kavl MIT ve macos/sys/tree.h içindeki BSD bildirimi ilgili kaynaklarda yer alır.
+
+## Experimental QUIC components
+ByeDPI e2684772fbda45f2ff4fc220922a010370534216 (MIT), with the documented macOS shutdown patch and a local QUIC Initial gate, and HEV SOCKS tunnel 21bb3d77e64ad5a413d4d851b9f4cacf2098cd77 (MIT), plus its pinned MIT/BSD dependencies, are source-built and bundled. Full sources are in vendor/byedpi and vendor/hev. Original notices are preserved there and in Experimental/UDP/Licenses. These are local processes, not remote VPN services.

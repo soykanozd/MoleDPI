@@ -6,11 +6,12 @@ swift build -c release --arch arm64 -Xswiftc -debug-prefix-map -Xswiftc "$PWD=/M
 APP="dist/MoleDPI.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Resources/MoleDPI.icns "$APP/Contents/Resources/"
-cp .build/native/moledpi-service .build/native/tpws .build/native/moledpi-pf "$APP/Contents/Resources/"
-for executable in tpws moledpi-pf moledpi-service; do strip -S -x "$APP/Contents/Resources/$executable"; done
+cp .build/native/{moledpi-service,tpws,moledpi-pf,ciadpi,tunnel-runner,moledpi-udp} "$APP/Contents/Resources/"
+for executable in tpws moledpi-pf moledpi-service ciadpi tunnel-runner moledpi-udp; do strip -S -x "$APP/Contents/Resources/$executable"; done
 codesign --force --options runtime --sign - "$APP/Contents/Resources/tpws"
 codesign --force --options runtime --sign - "$APP/Contents/Resources/moledpi-pf"
 codesign --force --options runtime --sign - "$APP/Contents/Resources/moledpi-service"
+for extra in ciadpi tunnel-runner moledpi-udp; do codesign --force --options runtime --sign - "$APP/Contents/Resources/$extra"; done
 BIN_DIR="$(swift build -c release --arch arm64 --show-bin-path)"
 cp "$BIN_DIR/MoleDPI" "$APP/Contents/MacOS/"
 strip -S -x "$APP/Contents/MacOS/MoleDPI"
@@ -22,17 +23,17 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>local.moledpi.app</string>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
 <key>CFBundleIconFile</key><string>MoleDPI.icns</string>
-<key>CFBundleVersion</key><string>101</string>
+<key>CFBundleVersion</key><string>110</string>
 <key>CFBundleName</key><string>MoleDPI</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.0.1</string>
-<key>MoleReleaseTag</key><string>v1.0.1</string>
+<key>CFBundleShortVersionString</key><string>1.1.0</string>
+<key>MoleReleaseTag</key><string>v1.1.0-beta</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
-for name in moledpi-service moledpi-pf tpws; do
+for name in moledpi-service moledpi-pf tpws ciadpi tunnel-runner moledpi-udp; do
   digest=$(shasum -a 256 "$APP/Contents/Resources/$name" | cut -d' ' -f1)
   /usr/libexec/PlistBuddy -c "Add :MoleSHA-$name string $digest" "$APP/Contents/Info.plist"
 done
@@ -46,7 +47,15 @@ cp vendor/zapret/LICENSE.txt "$APP/Contents/Resources/Licenses/Zapret-MIT.txt"
 # Ship complete corresponding source and all embedded dependency notices.
 SOURCE_DIR="$APP/Contents/Resources/Source"
 mkdir -p "$SOURCE_DIR"
-cp -R Sources Native vendor scripts Checks Tests Resources "$SOURCE_DIR/"
+python3 - "$SOURCE_DIR" <<'PYBUILD'
+import sys,shutil
+from pathlib import Path
+dest=Path(sys.argv[1])
+if dest.exists(): shutil.rmtree(dest)
+dest.mkdir(parents=True)
+for folder in ['Sources','Native','vendor','scripts','Checks','Tests','Resources','Experimental']:
+    shutil.copytree(folder,dest/folder,ignore=shutil.ignore_patterns('.git','*.o','*.a','*.dep','*.so','*.dll','*.exe','build','bin','ciadpi','__pycache__'))
+PYBUILD
 cp README.md BUILDING.md RELEASE-NOTES.md RELEASE-TESTS.md SECURITY.md Package.swift LICENSE NOTICE THIRD-PARTY.md "$SOURCE_DIR/"
 codesign --force --options runtime --sign - "$APP"
 printf 'Hazır: %s/dist/MoleDPI.app\n' "$PWD"

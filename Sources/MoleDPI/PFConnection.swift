@@ -23,17 +23,20 @@ struct SiteCheck: Identifiable, Sendable {
     var id: String { host }
 }
 protocol ConnectionEngine: Sendable {
+    var requestsQUIC: Bool { get }
     func start(targets: [SiteCheck]) async throws -> [SiteCheck]
     func health(targets: [SiteCheck]) async -> [SiteCheck]?
     func stop() async throws
     func shutdown() async throws
 }
 extension ConnectionEngine {
+    var requestsQUIC: Bool { false }
     func shutdown() async throws { try await stop() }
 }
 // Manages a source-built tpws probe and an ephemeral privileged PF session.
 // All process ownership and session state are serialized by this actor.
 actor PFConnection: ConnectionEngine {
+    nonisolated let requestsQUIC = !ProcessInfo.processInfo.arguments.contains("--tcp-only")
     static let profiles = [
         ["--split-pos=host+1", "--tlsrec=host+1"],
         ["--split-pos=2", "--oob=tls"],
@@ -125,7 +128,7 @@ actor PFConnection: ConnectionEngine {
         }
         let connection = ServiceClient.connect(serverHash: server)
         service = connection
-        do { try await ServiceClient.request(connection, session: session, profile: profile) }
+        do { try await ServiceClient.request(connection, session: session, profile: profile + (requestsQUIC ? 6 : 0)) }
         catch let rejection as WorkerStartRejected {
             // Authenticated explicit refusal means no worker for this UUID ran.
             if generation == id { statusURL = nil }

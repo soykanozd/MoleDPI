@@ -69,6 +69,12 @@ final class SignalFlag: @unchecked Sendable {
             guard lstat(url.path, &st) == 0, st.st_uid == 0, st.st_mode & S_IFMT == S_IFREG, st.st_mode & 0o022 == 0, st.st_size < 32768,
                   let journal = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
                   (journal["uid"] as? NSNumber)?.uint32Value == uid else { throw Failure(message: "Trusted PF recovery record not found.") }
+            guard try command(privilegedDirectory+"/moledpi-udp",["--recover",uuid.uuidString]).code == 0 else { throw Failure(message:"UDP cleanup could not be verified.") }
+            if let pid = (journal["enginePID"] as? NSNumber)?.int32Value, pid > 1 {
+                var buffer = [UInt8](repeating:0,count:4096)
+                let size = proc_pidpath(pid,&buffer,UInt32(buffer.count))
+                if size > 0 && String(decoding:buffer.prefix(Int(size)).prefix(while:{$0 != 0}),as:UTF8.self) == privilegedDirectory+"/tpws" { kill(pid,SIGTERM) }
+            }
             let emptied = try command(pfctl, ["-a", anchor(uid), "-f", "-"], input: "")
             guard emptied.code == 0 else { throw Failure(message: "Could not clear MoleDPI PF rules.") }
             if let token = journal["pfToken"] as? String {
@@ -85,7 +91,7 @@ final class SignalFlag: @unchecked Sendable {
               let uid = UInt32(CommandLine.arguments[1]), uid >= 500,
               let parent = Int32(CommandLine.arguments[2]), parent > 1,
               let uuid = UUID(uuidString: CommandLine.arguments[3]),
-              let profile = Int(CommandLine.arguments[5]), (0...5).contains(profile) else { throw Failure(message: "Invalid session request.") }
+              let profile = Int(CommandLine.arguments[5]), (0...11).contains(profile) else { throw Failure(message: "Invalid session request.") }
         let heartbeat = CommandLine.arguments[4]
         // Last argument is a version marker, not executable/configuration input.
         guard CommandLine.arguments[6] == "v1" else { throw Failure(message: "Session protocol version mismatch.") }
@@ -109,6 +115,9 @@ final class SignalFlag: @unchecked Sendable {
         let dir = "/var/run/moledpi/\(tokenString)"
         guard mkdir(dir, 0o755) == 0 else { throw Failure(message: "Oturum zaten mevcut.") }
         let stateURL = URL(fileURLWithPath: dir + "/status.json")
+        let engine = Process()
+        let udp = Process()
+        var udpReady = false
         var packetCount: UInt64 = 0
         let startedAt = DispatchTime.now().uptimeNanoseconds
         var stages: [String: Int] = [:]
@@ -117,6 +126,8 @@ final class SignalFlag: @unchecked Sendable {
             var value: [String: Any] = ["phase": phase, "message": message, "uid": uid, "pid": getpid()]
             for (label, elapsed) in stages { value[label] = elapsed }
             if let token { value["pfToken"] = token }
+            value["udpActive"] = udpReady
+            if engine.processIdentifier > 1 { value["enginePID"] = engine.processIdentifier }
             value["packets"] = packetCount
             value["checkedAt"] = Date().timeIntervalSince1970
             if let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) { try? data.write(to: stateURL, options: .atomic); chmod(stateURL.path, 0o644) }
@@ -126,7 +137,6 @@ final class SignalFlag: @unchecked Sendable {
             status("failed", "Session was cancelled before network configuration.")
             throw Failure(message: "Cancelled session.")
         }
-        let engine = Process()
         var pfToken: String?
         var loaded = false
         let name = anchor(uid)
@@ -151,6 +161,17 @@ final class SignalFlag: @unchecked Sendable {
                     ok = result.code == 0
                 } catch { ok = false }
             }
+            if udp.isRunning {
+                udp.terminate()
+                let deadline = Date().addingTimeInterval(4)
+                while udp.isRunning && Date() < deadline { Thread.sleep(forTimeInterval:0.05) }
+                if udp.isRunning { kill(udp.processIdentifier,SIGKILL); udp.waitUntilExit() }
+            }
+            if profile >= 6 {
+                do { if try command(privilegedDirectory+"/moledpi-udp",["--recover",tokenString]).code != 0 { ok = false } }
+                catch { ok = false }
+            }
+            udpReady = false
             if engine.isRunning {
                 engine.terminate()
                 let deadline = Date().addingTimeInterval(2)
@@ -202,7 +223,7 @@ final class SignalFlag: @unchecked Sendable {
             guard applied.code == 0 else { throw Failure(message: "Could not apply PF session rules.") }
             let check = try command(pfctl, ["-a", name, "-sr"])
             guard check.code == 0, check.text.contains("route-to"), engine.isRunning else { throw Failure(message: "Could not verify PF and tpws state.") }
-            if profile >= 3 {
+            if profile % 6 >= 3 {
                 guard ListenerReadiness.ownsTCPListener(pid: parent, port: 18083) else {
                     throw Failure(message: "Encrypted DNS listener is not owned by the client.")
                 }
@@ -215,11 +236,24 @@ final class SignalFlag: @unchecked Sendable {
                 }
                 dnsStore = store
             }
+            if profile >= 6 {
+                udp.executableURL = URL(fileURLWithPath:privilegedDirectory+"/moledpi-udp")
+                udp.arguments = [String(uid),String(parent),String(getpid()),"internet","443",tokenString,heartbeat,"session"]
+                udp.standardInput = FileHandle.nullDevice; udp.standardOutput = FileHandle.nullDevice; udp.standardError = FileHandle.nullDevice
+                try udp.run()
+                let deadline = Date().addingTimeInterval(6)
+                let file = URL(fileURLWithPath:"/var/run/moledpi-udp-"+tokenString+"/status.json")
+                while udp.isRunning && Date() < deadline && alive() && !signals.stopped {
+                    if let data = try? Data(contentsOf:file), let object = try? JSONSerialization.jsonObject(with:data) as? [String:Any], object["phase"] as? String == "active" { udpReady = true; break }
+                    Thread.sleep(forTimeInterval:0.03)
+                }
+                guard udpReady else { throw Failure(message:"Experimental UDP engine failed to start. Restoring network settings.") }
+            }
             mark("apply")
             status("active", token: pfToken)
             let startupWindow = DispatchTime.now() + .seconds(4)
             var iteration = 0
-            while alive() && !signals.stopped && engine.isRunning {
+            while alive() && !signals.stopped && engine.isRunning && (profile < 6 || udp.isRunning) {
                 let needsInitialCount = packetCount == 0 && DispatchTime.now() < startupWindow
                 if iteration % 4 == 0 || needsInitialCount {
                     let info = try command(pfctl, ["-s", "info"])
@@ -236,7 +270,7 @@ final class SignalFlag: @unchecked Sendable {
                 }
                 iteration += 1; Thread.sleep(forTimeInterval: needsInitialCount ? 0.12 : 0.5)
             }
-            let engineFailed = !engine.isRunning
+            let engineFailed = alive() && !signals.stopped && (!engine.isRunning || (profile >= 6 && !udp.isRunning))
             if clean() { status(engineFailed ? "failed" : "stopped", engineFailed ? "The network engine stopped unexpectedly." : "") }
             else { status("cleanup_failed", "PF cleanup failed. Recovery is required.", token: pfToken) }
         } catch {

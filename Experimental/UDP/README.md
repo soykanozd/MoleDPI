@@ -1,6 +1,6 @@
 # UDP / QUIC development lab — not an application feature
 
-**Experimental, incomplete, source-only development work. This is not a new MoleDPI release.**
+**The lab remains a separate test harness. Its tested design is now integrated in Native/UDPSession.swift for the experimental v1.1.0-beta app, restricted to public UDP/443. General UDP bypass remains unsupported.**
 
 This lab follows the local SOCKS + packet-tunnel architecture used by ByeDPI Android. It builds ByeDPI's UDP fake-packet engine and HEV's macOS packet-to-SOCKS implementation from pinned source. There is no remote server, account, paid API or Apple Developer membership requirement for these tests.
 
@@ -41,8 +41,8 @@ The lab's fake TTL is **1**, intentionally limited to the test. It is not a prod
 
 ## Not complete — do not advertise as app support
 
-- No system-wide packet interception or app integration has been implemented.
-- Physical macOS IPv4 utun/PF routing and the narrow lab crash recovery are tested. General application routing and integration with the installed privileged service remain incomplete.
+- The app integration processes public UDP/443 only. Other UDP remains direct; the lab is not a general production networking API.
+- Physical macOS IPv4 utun/PF routing and the narrow lab crash recovery are tested. The installed app has separate lifecycle/IPC integration and live tests; broader routing beyond public UDP/443 remains outside scope.
 - Native IPv6 packet-pipeline UDP/QUIC tests passed. The earlier IPv4-mapped fixture was replaced with a valid native assigned IPv6 endpoint; physical IPv6 PF/utun routing passed the six narrow test scenarios too.
 - No real ISP censorship test was available: the user reports existing voice, game and screen-sharing functions already work. Those sessions were not instrumented.
 - Remote QUIC/HTTP3, MTU/fragmentation behavior, concurrent load and long-duration stability remain unverified.

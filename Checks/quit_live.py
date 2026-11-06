@@ -15,7 +15,7 @@ def config():
 def workers():
     commands = subprocess.check_output(['/bin/ps', '-axo', 'comm='], text=True).splitlines()
     return [x.strip() for x in commands if x.strip() in
-            [app, priv+'moledpi-service', priv+'moledpi-pf', priv+'tpws',
+            [app, priv+'moledpi-service', priv+'moledpi-pf', priv+'tpws',priv+'moledpi-udp',priv+'ciadpi',priv+'tunnel-runner',
              '/Applications/MoleDPI.app/Contents/Resources/tpws']]
 for scenario in ['connected', 'idle', 'immediate', 'connecting', 'starting-worker', 'disconnecting', 'engine-failure', 'connected']:
     before = config()

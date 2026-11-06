@@ -3,3 +3,10 @@ dist/
 .DS_Store
 .swiftpm/
 __pycache__/
+
+*.o
+*.a
+*.dep
+vendor/byedpi/ciadpi
+vendor/hev/bin/
+vendor/hev/build/

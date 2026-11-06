@@ -140,7 +140,7 @@ import AppKit
         reportTitle = "Connection Help"
         let issue = lastIssue ?? (networkAvailable ? nil : .offline)
         let summary = issue.map { "Last observed issue\n" + $0.message + "\n\n" + $0.guidance } ?? "No specific failure has been recorded.\n\nIf access stops, check your internet connection and any network sign-in page. Retry Connect, or try another network. Failed access checks alone cannot identify censorship."
-        diagnostics = summary + "\n\nThese checks cover a few HTTPS destinations, not every website or application. TCP ports 80/443 are supported; UDP and QUIC bypass are not supported. Your public IP remains visible.\n\nNothing is uploaded automatically."
+        diagnostics = summary + "\n\nThese checks cover a few HTTPS destinations, not every website or application. TCP ports 80/443 are supported. Experimental QUIC processing covers UDP/443; other UDP uses the normal system path. ISP bypass is not guaranteed. Your public IP remains visible.\n\nNothing is uploaded automatically."
     }
     func reviewDiagnostics() {
         reportTitle = "Diagnostics"
@@ -150,6 +150,7 @@ import AppKit
             "Check category: " + (lastIssue?.rawValue ?? "none"),
             "State: " + String(describing: state),
             "Connection requested: " + String(wantsConnection),
+            "UDP/443 requested: " + String(engine.requestsQUIC),
             "Recovering: " + String(recovering),
             "Cleanup required: " + String(recoveryNeeded),
             "Verified targets: " + String(sites.filter { $0.reachable == true }.count) + "/" + String(sites.count),
