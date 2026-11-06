@@ -27,4 +27,9 @@ cc -I "$lab/hev/src" Experimental/UDP/tunnel-runner.c \
   "$lab/hev/third-part/lwip/bin/liblwip.a" "$lab/hev/third-part/hev-task-system/bin/libhev-task-system.a" \
   -lpthread -o "$lab/tunnel-runner"
 swiftc Experimental/UDP/quic_fixture.swift -o "$lab/quic-fixture"
+swiftc -swift-version 5 -parse-as-library Sources/MoleDPI/ListenerReadiness.swift Experimental/UDP/PhysicalSupervisor.swift -o "$lab/physical-supervisor"
+for executable in "$lab/byedpi/ciadpi" "$lab/tunnel-runner" "$lab/quic-fixture" "$lab/physical-supervisor"; do
+  codesign --force --options runtime --sign - "$executable"
+  codesign --verify --strict "$executable"
+done
 print 'Built isolated UDP lab from pinned source. No routes or app files changed.'

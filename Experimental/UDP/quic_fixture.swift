@@ -39,14 +39,14 @@ if args[1] == "server" {
     }
     listener.start(queue:queue)
 } else {
-    guard args.count == 4, let port = UInt16(args[2]), let expected = try? Data(contentsOf:URL(fileURLWithPath:args[3])) else { fail("client input") }
+    guard (args.count == 4 || args.count == 5), let port = UInt16(args[2]), let expected = try? Data(contentsOf:URL(fileURLWithPath:args[3])) else { fail("client input") }
     sec_protocol_options_set_tls_server_name(quic.securityProtocolOptions,"localhost")
     sec_protocol_options_set_verify_block(quic.securityProtocolOptions,{ _,trust,complete in
         let reference = sec_trust_copy_ref(trust).takeRetainedValue()
         let chain = SecTrustCopyCertificateChain(reference) as? [SecCertificate]
         complete(chain?.first.map { SecCertificateCopyData($0) as Data == expected } ?? false)
     },queue)
-    let connection=NWConnection(host:"127.0.0.1",port:NWEndpoint.Port(rawValue:port)!,using:params)
+    let connection=NWConnection(host:NWEndpoint.Host(args.count == 5 ? args[4] : "127.0.0.1"),port:NWEndpoint.Port(rawValue:port)!,using:params)
     let content=Data("MoleDPI real QUIC echo".utf8)
     connection.stateUpdateHandler = { state in
         switch state {
@@ -65,5 +65,5 @@ if args[1] == "server" {
     }
     connection.start(queue:queue)
 }
-queue.asyncAfter(deadline:.now()+15) { fail("QUIC fixture timeout") }
+queue.asyncAfter(deadline:.now()+(args[1] == "server" ? 120 : 15)) { fail("QUIC fixture timeout") }
 dispatchMain()

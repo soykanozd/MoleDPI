@@ -4,6 +4,8 @@
 No root, routes, PF, DNS settings, packet capture or external traffic.
 """
 import contextlib
+import ipaddress
+import re
 import os
 from pathlib import Path
 import select
@@ -28,6 +30,16 @@ def local_address():
             return address
     raise RuntimeError('An active local IPv4 interface is needed for this fixture')
 LOCAL = local_address()
+def local_ipv6():
+    for _, name in socket.if_nameindex():
+        if name.startswith('lo'): continue
+        text=subprocess.run(['/sbin/ifconfig',name],capture_output=True,text=True).stdout
+        for address in re.findall(r'inet6\s+([0-9a-f:]+)',text):
+            ip=ipaddress.IPv6Address(address)
+            if not ip.is_link_local and not ip.is_loopback and not ip.is_unspecified:
+                return address
+    return None
+LOCAL6 = local_ipv6()
 
 def checksum(data):
     if len(data) % 2: data += b'\x00'
@@ -38,7 +50,7 @@ def checksum(data):
 def packet(data, port, family=socket.AF_INET, source_port=35000):
     v6 = family == socket.AF_INET6
     src = socket.inet_pton(family, 'fd00::2' if v6 else '198.18.0.2')
-    dst = socket.inet_pton(family, '::ffff:'+LOCAL if v6 else LOCAL)
+    dst = socket.inet_pton(family, LOCAL6 if v6 else LOCAL)
     udp = struct.pack('!HHHH', source_port, port, len(data)+8, 0) + data
     pseudo = src+dst+(struct.pack('!I3xB',len(udp),17) if v6 else struct.pack('!BBH',0,17,len(udp)))
     udp = udp[:6] + struct.pack('!H', checksum(pseudo+udp) or 65535) + udp[8:]
@@ -92,8 +104,8 @@ def pipeline(fake=False, quic=False):
                 yield parent,engine,tunnel
 
 def test_roundtrip(fake, family):
-    with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as endpoint, pipeline(fake) as (tun,engine,tunnel):
-        endpoint.bind((LOCAL,0))
+    with socket.socket(family,socket.SOCK_DGRAM) as endpoint, pipeline(fake) as (tun,engine,tunnel):
+        endpoint.bind((LOCAL6 if family==socket.AF_INET6 else LOCAL,0))
         time.sleep(.6)  # Regression: idle poll slices must not terminate the engine.
         test=b'actual-udp-payload-'+bytes(range(256))*4
         frame=packet(test,endpoint.getsockname()[1],family)
@@ -127,4 +139,6 @@ def test_roundtrip(fake, family):
 if __name__=='__main__':
     for fake in [False,True]:
         test_roundtrip(fake,socket.AF_INET)
-    print('SCOPE local IPv4 packet pipeline and controlled filter only; native IPv6 remains unverified')
+        if LOCAL6: test_roundtrip(fake,socket.AF_INET6)
+    print('SCOPE local assigned-address packet pipeline and controlled filter, not an ISP bypass test')
+    if not LOCAL6: print('SKIP native IPv6: no assigned non-link-local IPv6 endpoint')
