@@ -1,20 +1,9 @@
-# UDP behavior and capability status
+# UDP/QUIC integration status — v1.1.0-beta
 
-## What works and what is implemented
-MoleDPI processes public TCP ports 80/443 through tpws and its PF anchor. Application UDP/QUIC flows are left to the ordinary system network path. The small UDP/TCP DNS recovery listener is a DNS-only component, not a general UDP relay.
+Connect starts the TCP engine plus an experimental local QUIC backend. The signed-in user's public UDP/443 is routed over IPv4/IPv6 through HEV and source-built ByeDPI. Fake injection is limited to plausible QUIC v1/v2 Initial packets. Other UDP/443 payloads are relayed unchanged; other UDP ports and private/LAN destinations remain on the normal network. The proxy drops to nobody; the root guardian owns PF/utun and cleanup.
 
-Voice calls, screen sharing and game sessions may work with MoleDPI active. A user reported these functions working in their own setup. This is a user observation, not an independently instrumented protocol test or a guarantee across networks. Opening TCP signaling or HTTPS resources can be enough for an application whose media/game traffic is already reachable. Some applications can also use fallback transports. We have not established which path carried those reported sessions.
+The installed app passed ten Connect/Disconnect cycles with verified HTTPS and restored networking, a real public QUIC handshake with system TLS verification and positive owned UDP PF counters, eight Quit cases and app-SIGKILL cleanup with no owned engines left. Earlier lab tests cover twelve narrow physical IPv4/IPv6 routing/crash cases. No real ISP-blocked path was available. These are not guarantees of HTTP/3 semantics, arbitrary UDP bypass or universal voice/game support. TTL 8 is a fixed experimental choice, not ISP calibration. IP addresses remain visible.
 
-**No system-wide UDP/QUIC censorship-bypass feature has been implemented.** A successful call or game session does not, by itself, prove that an otherwise blocked UDP path was modified.
+The panel is unchanged. Connected still means the configured HTTPS checks and local engine/session verification passed, not every website or UDP service. Diagnostics distinguish whether UDP/443 was requested. Quit before using the advanced TCP-only launch: `open -a MoleDPI --args --tcp-only`.
 
-## Verified locally
-Run `python3 Checks/udp_capability.py` after building the source engine. It starts only an owned, unprivileged loopback tpws instance, checks that SOCKS UDP ASSOCIATE is rejected with reply 0x07, and checks intact direct loopback UDP datagrams while that instance runs. It changes no PF rules or routes and contacts no public endpoint. It does not exercise the installed transparent PF session or establish external UDP reachability/censorship bypass.
-
-The installed PF rules in `Native/PFSession.swift` select TCP only. The pinned tpws SOCKS handler in `vendor/zapret/tpws/tpws_conn.c` accepts CONNECT and explicitly rejects UDP ASSOCIATE.
-
-## Options reviewed, not integrated
-- [Zapret macOS notes](https://github.com/bol-van/zapret/blob/master/docs/bsd.en.md#macos): upstream documents that dvtws packet diversion is not functional on macOS, while tpws works with PF. Its Linux/FreeBSD UDP features cannot simply be enabled in this macOS tpws build.
-- [ByeDPI](https://github.com/hufrea/byedpi): documents SOCKS UDP handling and UDP fake-packet options. A SOCKS capability alone does not capture UDP from arbitrary macOS applications. Compatibility, interception and whether a strategy actually helps against an observed block need separate verification.
-- [ByeDPI Android](https://github.com/dovecoteescapee/ByeDPIAndroid): redirects application traffic using Android's local VPN service and a separate SOCKS tunnel component. This is not a macOS integration. A local tunnel does not inherently require a paid remote server, but also does not inherently defeat filtering.
-
-A future local UDP implementation needs a reviewed macOS capture/forwarding path, IPv4/IPv6 and MTU handling, flow/NAT lifetime management, bounded resources, safe route restoration, crash recovery and tests against a genuinely failing UDP path. Forwarding must be distinguished from verified censorship bypass. No such component has been installed or silently enabled by this documentation change.
+Source and test details: Native/UDPSession.swift, Native/PFSession.swift, vendor/byedpi/moledpi_quic.h and Experimental/UDP/README.md. Engines are source-built, dependency notices and complete corresponding source are distributed. No paid API, remote VPN server or developer account is required to use this backend. Independent security review and broader deployment testing remain pending.

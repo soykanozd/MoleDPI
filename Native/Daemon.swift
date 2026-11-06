@@ -12,7 +12,7 @@ private func retireIfIdle() {
     DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
         workerLock.lock(); defer { workerLock.unlock() }
         guard clients == 0 else { return }
-        if worker?.isRunning == true { retireIfIdle(); return }
+        if worker != nil { retireIfIdle(); return }
         exit(EXIT_SUCCESS)
     }
 }
@@ -25,7 +25,7 @@ private final class Endpoint: NSObject, PFControl {
     }
     func start(_ session: String, profile: Int, reply: @escaping (String) -> Void) {
         guard let uuid = UUID(uuidString: session), session == uuid.uuidString,
-              (0...5).contains(profile), let user = getpwuid(uid) else {
+              (0...11).contains(profile), let user = getpwuid(uid) else {
             reply("Invalid session request."); return
         }
         let home = String(cString: user.pointee.pw_dir)
@@ -40,7 +40,7 @@ private final class Endpoint: NSObject, PFControl {
     }
     private func run(_ args: [String], wait: Bool, reply: @escaping (String) -> Void) {
         workerLock.lock(); defer { workerLock.unlock() }
-        guard worker?.isRunning != true else { reply("A network worker is already running."); return }
+        guard worker == nil else { reply("A network worker is already running."); return }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: PFService.root + "/moledpi-pf")
         process.arguments = args
@@ -49,8 +49,24 @@ private final class Endpoint: NSObject, PFControl {
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         do {
+            if !wait {
+                process.terminationHandler = { _ in
+                    let status = URL(fileURLWithPath:"/var/run/moledpi/"+args[2]+"/status.json")
+                    if let data = try? Data(contentsOf:status), let state = try? JSONSerialization.jsonObject(with:data) as? [String:Any],
+                       ["stopped","failed"].contains(state["phase"] as? String ?? ""), state["pfToken"] == nil {
+                        workerLock.lock(); worker = nil; workerLock.unlock(); retireIfIdle(); return
+                    }
+                    let repair = Process()
+                    repair.executableURL = URL(fileURLWithPath:PFService.root+"/moledpi-pf")
+                    repair.arguments = ["--repair",String(self.uid),args[2]]
+                    repair.standardInput = FileHandle.nullDevice; repair.standardOutput = FileHandle.nullDevice; repair.standardError = FileHandle.nullDevice
+                    do { try repair.run(); repair.waitUntilExit() } catch { return }
+                    guard repair.terminationStatus == 0 else { return }
+                    workerLock.lock(); worker = nil; workerLock.unlock(); retireIfIdle()
+                }
+            }
             try process.run(); worker = process
-            if wait { process.waitUntilExit() }
+            if wait { process.waitUntilExit(); worker = nil }
             reply(wait && process.terminationStatus != 0 ? "Network recovery failed." : "")
         } catch { reply("Could not start the installed network worker.") }
     }

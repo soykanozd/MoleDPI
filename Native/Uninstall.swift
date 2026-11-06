@@ -26,7 +26,7 @@ import AppKit
         label=local.moledpi.pf-service
         if launchctl print system/$label >/dev/null 2>&1; then launchctl bootout system/$label; fi
         rm -f /Library/LaunchDaemons/$label.plist
-        for n in moledpi-service moledpi-pf tpws; do rm -f "$r/$n"; done
+        for n in moledpi-service moledpi-pf tpws ciadpi tunnel-runner moledpi-udp; do rm -f "$r/$n"; done
         if [ -d "$r" ]; then rmdir "$r"; fi
         """
         func quote(_ value: String) -> String {

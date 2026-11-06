@@ -43,3 +43,12 @@ else:
     raise RuntimeError('PF recovery did not finish after client death')
 assert config() == before
 print('PASS: restarted client used installed service; watchdog restored network after SIGKILL')
+
+end = time.monotonic()+8
+names = ['/Library/PrivilegedHelperTools/local.moledpi/'+n for n in ['moledpi-pf','tpws','moledpi-udp','ciadpi','tunnel-runner','moledpi-service']]
+while time.monotonic()<end:
+    commands=subprocess.check_output(['/bin/ps','-axo','comm='],text=True).splitlines()
+    if not any(line.strip() in names for line in commands): break
+    time.sleep(.1)
+else: raise RuntimeError('Owned engines remained after client crash')
+print('PASS all TCP/UDP/tunnel processes exited after app crash')

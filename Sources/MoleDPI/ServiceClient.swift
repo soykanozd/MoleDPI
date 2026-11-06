@@ -12,7 +12,7 @@ struct WorkerStartRejected: LocalizedError {
 }
 
 enum ServiceClient {
-    static let names = ["moledpi-service", "moledpi-pf", "tpws"]
+    static let names = ["moledpi-service", "moledpi-pf", "tpws", "ciadpi", "tunnel-runner", "moledpi-udp"]
     static func hex(_ value: String?, length: Int) throws -> String {
         guard let value, value.count == length,
               value.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else {
@@ -85,7 +85,7 @@ enum ServiceClient {
         if launchctl print system/\(PFService.name) >/dev/null 2>&1; then
           launchctl bootout system/\(PFService.name)
         fi
-        for n in moledpi-service moledpi-pf tpws; do
+        for n in moledpi-service moledpi-pf tpws ciadpi tunnel-runner moledpi-udp; do
           install -S -o root -g wheel -m 755 "$tmp/$n" \(q(PFService.root))/"$n"
         done
         install -S -o root -g wheel -m 644 "$tmp/service.plist" \(q(PFService.plist))

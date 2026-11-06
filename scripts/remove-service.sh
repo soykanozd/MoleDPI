@@ -8,5 +8,5 @@ if /bin/launchctl print system/$label >/dev/null 2>&1; then /bin/launchctl booto
 /bin/rm -f /Library/LaunchDaemons/$label.plist
 rootdir=/Library/PrivilegedHelperTools/local.moledpi
 [[ ! -L $rootdir && ! -L /Library/PrivilegedHelperTools ]] || exit 1
-/bin/rm -f "$rootdir"/{moledpi-service,moledpi-pf,tpws}
+/bin/rm -f "$rootdir"/{moledpi-service,moledpi-pf,tpws,ciadpi,tunnel-runner,moledpi-udp}
 [[ ! -d $rootdir ]] || /bin/rmdir "$rootdir"

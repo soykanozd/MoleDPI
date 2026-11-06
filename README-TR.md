@@ -29,7 +29,7 @@ Apple Silicon işlemcili Mac ve macOS 13 veya üzeri hedeflenir. Eski macOS sür
 
 ## Gerçek sınırlar ve gizlilik
 
-Bu araç VPN veya anonimlik hizmeti değildir; genel IP adresini gizlemez. DPI işlemesini TCP 80/443 üzerinde yapar. Uygulamaların UDP/QUIC trafiği normal ağ yolunu kullanır; MoleDPI bunu işlemez. Ağ yolları erişilebiliyorsa ses, ekran paylaşımı ve oyunlar çalışabilir. Bu, bir UDP engelinin aşıldığı anlamına gelmez. [UDP davranışı ve test kapsamı](docs/UDP.md) belgesine bak. Connected, belirli HTTPS kontrollerinin ve ağ motoru doğrulamasının geçtiğini gösterir; bütün internet için garanti vermez.
+Bu araç VPN veya anonimlik hizmeti değildir; genel IP adresini gizlemez. DPI işlemesini TCP 80/443 üzerinde yapar. v1.1.0-beta genel internete giden UDP/443 için deneysel QUIC işlemesi ekler; diğer UDP trafiği normal ağ yolunu kullanır. Ağ yolları erişilebiliyorsa ses, ekran paylaşımı ve oyunlar çalışabilir. Bu, bir UDP engelinin aşıldığı anlamına gelmez. [UDP davranışı ve test kapsamı](docs/UDP.md) belgesine bak. Connected, belirli HTTPS kontrollerinin ve ağ motoru doğrulamasının geçtiğini gösterir; bütün internet için garanti vermez.
 
 Gerekirse yalnızca kaynak kodda tanımlı sınırlı alan adları için Quad9 üzerinden HTTPS ile DNS kurtarması kullanılır. Quad9 bu sorguları görebilir; diğer DNS trafiği sistem ayarlarını izler. Uygulama tarama geçmişi veya trafik içeriği kaydetmez; tanılama raporlarını kendiliğinden göndermez. İsteğe bağlı güncelleme kontrolünde GitHub istek IP'sini görebilir.
 

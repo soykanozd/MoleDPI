@@ -10,3 +10,6 @@ for suite in Stability FeatureTests NetworkRecovery; do
   swiftc -swift-version 5 -parse-as-library "${sources[@]}" "Checks/$suite.swift" -o ".build/checks/$suite"
   ".build/checks/$suite"
 done
+
+clang -fsanitize=address,undefined Checks/QUICGate.c -o .build/checks/quic-gate
+.build/checks/quic-gate
