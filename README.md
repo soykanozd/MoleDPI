@@ -4,7 +4,7 @@
 
 [Download for Mac](https://github.com/soykanozd/MoleDPI/releases/latest/download/MoleDPI.dmg) · [Latest release](https://github.com/soykanozd/MoleDPI/releases/latest) · [Türkçe kurulum](README-TR.md) · [Build from source](BUILDING.md)
 
-**EXPERIMENTAL — bugs, connection failures and network interruptions may occur.**
+**Network compatibility varies. Read the verified scope and known limitations below.**
 
 A free, open-source macOS menu-bar application for trying local DPI circumvention with source-built zapret **tpws**. No remote VPN server or account is required.
 
@@ -20,9 +20,9 @@ A free, open-source macOS menu-bar application for trying local DPI circumventio
 - Source-built zapret tpws engine; local TCP/TLS splitting with macOS Packet Filter.
 - No VPN server, account, subscription or developer-operated relay.
 - HTTPS verification, controlled reconnection and connection-help guidance.
-- General-purpose TCP 80/443 processing. Experimental QUIC Initial fake-packet processing covers public UDP/443. Other UDP remains direct; anonymity is not provided.
+- General-purpose TCP 80/443 processing. QUIC Initial fake-packet processing covers public UDP/443. Other UDP remains direct; anonymity is not provided.
 
-**QUIC beta:** [v1.1.1-beta download](https://github.com/soykanozd/MoleDPI/releases/download/v1.1.1-beta/MoleDPI.dmg) · [Beta notes](https://github.com/soykanozd/MoleDPI/releases/tag/v1.1.1-beta). Experimental public UDP/443 support; other UDP stays direct.
+**v1.2.0:** [Download](https://github.com/soykanozd/MoleDPI/releases/download/v1.2.0/MoleDPI.dmg) · [Release notes](https://github.com/soykanozd/MoleDPI/releases/tag/v1.2.0) · [Verification results](RELEASE-TESTS.md). Public UDP/443 is processed; other UDP stays direct.
 
 ## Download and install
 
@@ -36,7 +36,7 @@ A free, open-source macOS menu-bar application for trying local DPI circumventio
 
 No Terminal, Homebrew, Xcode or additional network tools are needed to run the packaged app.
 
-**Important:** This experimental build is ad-hoc signed and **not notarized by Apple**. Gatekeeper may block an internet-downloaded copy. See [Apple's instructions for opening an app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac). Only approve a copy you trust. Do not disable Gatekeeper. If macOS offers no permitted way to open this build, wait for a notarized release.
+**Important:** This build is ad-hoc signed and **not notarized by Apple**. Gatekeeper may block an internet-downloaded copy. See [Apple's instructions for opening an app from an unidentified developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac). Only approve a copy you trust. Do not disable Gatekeeper. If macOS offers no permitted way to open this build, wait for a notarized release.
 
 ## Use
 
@@ -58,9 +58,9 @@ If the ordinary DNS path fails for supported recovery domains, MoleDPI can use Q
 
 ## Known limitations
 
-- **Experimental software. Bugs and outages are possible.**
+- Bugs and outages remain possible. Release status is not a universal network-compatibility or security certification.
 - Apple Silicon binaries only. Minimum target macOS 13; runtime verification has been limited to a recent macOS release. Older macOS versions, Intel Macs and a clean-Mac install are not certified.
-- DPI processing covers TCP 80/443. **Experimental QUIC processing also covers public UDP/443 for the signed-in user, over IPv4 and IPv6. Other UDP stays on the normal network.** Voice calls, screen sharing and games can work when their network paths are reachable. This is not a guarantee against every UDP block. See [UDP behavior and test scope](docs/UDP.md).
+- DPI processing covers TCP 80/443. **QUIC processing also covers public UDP/443 for the signed-in user, over IPv4 and IPv6. Other UDP stays on the normal network.** Voice calls, screen sharing and games can work when their network paths are reachable. This is not a guarantee against every UDP block. See [UDP behavior and test scope](docs/UDP.md).
 - Your public IP remains visible. This is not an anonymity service.
 - Supplemental recovery queries use a local UDP/TCP bridge and certificate-verified DNS-over-HTTPS to Quad9. Quad9 can see those queries. Ordinary system DNS queries outside recovery remain governed by your system settings. HTTPS certificate validation stays enabled.
 - Checks contact fixed public HTTPS control destinations listed in the source (`Model.swift`). These are test endpoints, not application-specific support promises. No browsing history, traffic-content logging or analytics SDK is included.
@@ -70,11 +70,11 @@ If the ordinary DNS path fails for supported recovery domains, MoleDPI can use Q
 
 ## Remove
 
-Disconnect and quit MoleDPI. Open **Uninstall MoleDPI** from the disk image, approve the macOS prompt, then move MoleDPI from Applications to the Trash. Deleting the main app alone leaves the helper registration installed. The experimental graphical uninstaller has been built and signature-checked; a clean-machine removal test remains pending.
+Disconnect and quit MoleDPI. Open **Uninstall MoleDPI** from the disk image, approve the macOS prompt, then move MoleDPI from Applications to the Trash. Deleting the main app alone leaves the helper registration installed. The graphical uninstaller has been built and signature-checked; a clean-machine removal test remains pending.
 
 ## Source and acknowledgements
 
-The engine is [zapret tpws](https://github.com/bol-van/zapret), pinned at `73ee2aa04e6e94922e7dc07554a1c3a456dc3201`. [GoodbyeDPI](https://github.com/ValdikSS/GoodbyeDPI) inspired the straightforward project documentation; its Windows driver is not bundled. [ByeDPI](https://github.com/hufrea/byedpi) was reviewed but is not bundled.
+The engine is [zapret tpws](https://github.com/bol-van/zapret), pinned at `73ee2aa04e6e94922e7dc07554a1c3a456dc3201`. [GoodbyeDPI](https://github.com/ValdikSS/GoodbyeDPI) inspired the straightforward project documentation; its Windows driver is not bundled. Source-built [ByeDPI](https://github.com/hufrea/byedpi) and [HEV SOCKS5 tunnel](https://github.com/heiher/hev-socks5-tunnel) provide the local UDP/443 path; source pins and licenses are recorded in [THIRD-PARTY.md](THIRD-PARTY.md). Android UI code is not included.
 
 MoleDPI is **GPL-3.0-only**. See [LICENSE](LICENSE), [NOTICE](NOTICE) and [THIRD-PARTY.md](THIRD-PARTY.md). Complete corresponding source and build scripts are distributed alongside the binary and within its application bundle. Upstream copyright notices are retained.
 
@@ -103,7 +103,7 @@ Wake and path events invalidate results from earlier network checks. The control
 
 **Is MoleDPI a VPN?** No. It tries local TCP/TLS techniques; it does not route your traffic through a remote VPN server or hide your public IP.
 
-**Will every website and app work?** No. Results depend on the network and filtering method. Connected means the engine and selected HTTPS checks passed, not universal access. Public UDP/443 is processed by the experimental QUIC backend; other UDP uses the normal network. Results depend on the filtering method.
+**Will every website and app work?** No. Results depend on the network and filtering method. Connected means the engine and selected HTTPS checks passed, not universal access. Public UDP/443 is processed by the local QUIC backend; other UDP uses the normal network. Results depend on the filtering method.
 
 **Why does macOS show an unidentified-developer warning?** Public builds currently use an ad-hoc signature and have no Apple notarization. Read the installation warning above and only approve software you trust.
 
@@ -113,14 +113,14 @@ Wake and path events invalidate results from earlier network checks. The control
 
 Reproducible bug reports, sanitized compatibility results, documentation improvements and code review are welcome. See [Contributing](CONTRIBUTING.md) and [open an issue](https://github.com/soykanozd/MoleDPI/issues/new/choose). Keep personal details and browsing history out of public reports.
 
-If MoleDPI is useful to you, a GitHub star or sharing the repository link can help others discover it. Please keep the experimental status and support limitations alongside any recommendation.
+If MoleDPI is useful to you, a GitHub star or sharing the repository link can help others discover it. Please keep the verified scope and support limitations alongside any recommendation.
 
-## Experimental UDP/443 integration (v1.1.1-beta)
+## UDP/443 integration (v1.2.0)
 Connect now starts source-built ByeDPI and a local HEV utun alongside the existing TCP engine. Only this user's public UDP/443 is routed through it. Fake packets are restricted to plausible QUIC v1/v2 Initial packets; unknown UDP/443 payloads are relayed without fake injection. The proxy drops to the nobody account. Private/LAN destinations, other users and other UDP ports are excluded. No remote VPN server, paid API or login is used. Default routes and DNS preferences are preserved.
 
-The backend is joined on Disconnect/Quit; independent journal-based recovery handles worker loss. The fixed fake TTL is 8, not an ISP-calibrated strategy. A successful QUIC handshake proves transport operation, not that a real block was bypassed. HTTP/3 application semantics and universal game/voice access are not certified.
+The backend is joined on Disconnect/Quit; independent journal-based recovery handles worker loss. The fixed fake TTL is 8, not an ISP-calibrated strategy. Real HTTP/3 acceptance tests use no TCP fallback and verify complete response bodies, parallel streams, concurrent connections and idle/resume. A successful transfer does not prove that a real block was bypassed. No real ISP-blocked QUIC path was available. Public IPv6 internet access, broad macOS compatibility, artificial packet loss/MTU blackholes and universal application access are not certified. See [measured results](RELEASE-TESTS.md).
 
-For an advanced TCP-only fallback, Quit first, then launch `open -a MoleDPI --args --tcp-only`. The ordinary panel is unchanged. Installing a changed ad-hoc build may require one helper approval. This beta is not Apple-notarized.
+For an advanced TCP-only fallback, Quit first, then launch `open -a MoleDPI --args --tcp-only`. The ordinary panel is unchanged. Installing a changed ad-hoc build may require one helper approval. This release is not Apple-notarized.
 
 ### Automatic TCP fallback and issue reports
 If the QUIC backend cannot start or exits, MoleDPI first verifies its cleanup and keeps the TCP session running. Failed cleanup still stops the session rather than pretending fallback is safe. When connected with QUIC unavailable, the panel says **Connected using TCP. QUIC is unavailable.**

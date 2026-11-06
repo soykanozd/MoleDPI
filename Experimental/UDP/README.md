@@ -1,6 +1,6 @@
 # UDP / QUIC development lab — not an application feature
 
-**The lab remains a separate test harness. Its tested design is now integrated in Native/UDPSession.swift for the experimental v1.1.0-beta app, restricted to public UDP/443. General UDP bypass remains unsupported.**
+**The lab remains a separate test harness. Its tested design is now integrated in Native/UDPSession.swift for the public UDP/443 app backend, restricted to public UDP/443. General UDP bypass remains unsupported.**
 
 This lab follows the local SOCKS + packet-tunnel architecture used by ByeDPI Android. It builds ByeDPI's UDP fake-packet engine and HEV's macOS packet-to-SOCKS implementation from pinned source. There is no remote server, account, paid API or Apple Developer membership requirement for these tests.
 
@@ -45,7 +45,7 @@ The lab's fake TTL is **1**, intentionally limited to the test. It is not a prod
 - Physical macOS IPv4 utun/PF routing and the narrow lab crash recovery are tested. The installed app has separate lifecycle/IPC integration and live tests; broader routing beyond public UDP/443 remains outside scope.
 - Native IPv6 packet-pipeline UDP/QUIC tests passed. The earlier IPv4-mapped fixture was replaced with a valid native assigned IPv6 endpoint; physical IPv6 PF/utun routing passed the six narrow test scenarios too.
 - No real ISP censorship test was available: the user reports existing voice, game and screen-sharing functions already work. Those sessions were not instrumented.
-- Remote QUIC/HTTP3, MTU/fragmentation behavior, concurrent load and long-duration stability remain unverified.
+- Installed-app remote HTTP/3, concurrent load and bounded sustained-session tests are documented in ../../RELEASE-TESTS.md. Artificial packet-loss/MTU blackhole and 24-hour stability remain unverified.
 
 Before integrating into the app, add a bounded macOS capture/forwarding path, preserve the current TCP engine and privileged XPC restrictions, exclude local/control traffic, validate IPv4/IPv6 and MTU behavior, restore only owned settings after disconnect/crash, and demonstrate the strategy on an actually blocked UDP/QUIC path. Forwarding success must remain distinct from censorship-bypass success.
 

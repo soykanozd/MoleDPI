@@ -302,7 +302,7 @@ struct Panel: View {
                         Text("This project is a small contribution to a more open internet. Simple, transparent, and accessible to everyone.")
                     }.foregroundStyle(MolePalette.secondary)
                     Text("The internet should be open to everyone.").bold()
-                    Text("Experimental · Bugs and connection failures may occur.").font(.system(size: 12)).foregroundStyle(MolePalette.secondary)
+                    Text("Network compatibility varies. Interruptions may occur.").font(.system(size: 12)).foregroundStyle(MolePalette.secondary)
                     UpdateControls(checker: model.updates)
                     Button("Connection Help") { model.reviewConnectionHelp() }.buttonStyle(.plain)
                     Button("Review Diagnostics") { model.reviewDiagnostics() }.buttonStyle(.plain)

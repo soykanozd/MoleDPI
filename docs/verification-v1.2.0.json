@@ -1,0 +1,136 @@
+{
+  "release": "v1.2.0",
+  "release_type": "regular",
+  "long_acceptance_build": {
+    "isp_bypass": "not tested",
+    "physical_wifi_roaming_or_sleep": "not tested",
+    "http3": [
+      {
+        "result": "pass",
+        "family": "IPv4",
+        "protocol": "h3",
+        "certificate_verification": true,
+        "tcp_fallback": false,
+        "requests": 483,
+        "response_bytes": 1500916,
+        "median_ms": 34.04,
+        "slowest_ms": 284.92,
+        "sustained_seconds": 300,
+        "concurrent_connections": 4,
+        "streams_per_connection": 5,
+        "idle_resume_seconds": 5,
+        "mtu_blackhole_or_loss_injection": "not tested",
+        "isp_bypass": "not tested"
+      },
+      {
+        "family": "IPv6",
+        "result": "not_available",
+        "reason": "no public IPv6 route"
+      }
+    ],
+    "sampled_usage": {
+      "peak_sampled_cpu_percent": 44.4,
+      "peak_sampled_rss_kib": 76768,
+      "sample_interval_seconds": 1
+    },
+    "owned_udp_packet_increase": 10208,
+    "clean_exit": true,
+    "network_restored": true,
+    "no_owned_processes_left": true,
+    "result": "pass"
+  },
+  "udp_components_match_long_acceptance_build": {
+    "ciadpi": true,
+    "tunnel-runner": true,
+    "moledpi-udp": true
+  },
+  "final_installed_http3": {
+    "isp_bypass": "not tested",
+    "physical_wifi_roaming_or_sleep": "not tested",
+    "http3": [
+      {
+        "result": "pass",
+        "family": "IPv4",
+        "protocol": "h3",
+        "certificate_verification": true,
+        "tcp_fallback": false,
+        "requests": 107,
+        "response_bytes": 1500916,
+        "median_ms": 30.56,
+        "slowest_ms": 499.43,
+        "sustained_seconds": 0,
+        "concurrent_connections": 4,
+        "streams_per_connection": 5,
+        "idle_resume_seconds": 5,
+        "mtu_blackhole_or_loss_injection": "not tested",
+        "isp_bypass": "not tested"
+      },
+      {
+        "family": "IPv6",
+        "result": "not_available",
+        "reason": "no public IPv6 route"
+      }
+    ],
+    "sampled_usage": {
+      "peak_sampled_cpu_percent": 7.2,
+      "peak_sampled_rss_kib": 71952,
+      "sample_interval_seconds": 1
+    },
+    "owned_udp_packet_increase": 790,
+    "clean_exit": true,
+    "network_restored": true,
+    "no_owned_processes_left": true,
+    "result": "pass"
+  },
+  "final_endurance": {
+    "cycles": 62,
+    "verified_connections": 63,
+    "network_restored": true,
+    "no_owned_processes_left": true,
+    "connect_mean_ms": 1425.11,
+    "connect_median_ms": 1289.56,
+    "connect_slowest_ms": 6389.1,
+    "peak_sampled_cpu_percent": 45.4,
+    "peak_sampled_rss_kib": 87520,
+    "sample_interval_seconds": 0.5,
+    "physical_network_changes": "not tested",
+    "result": "interrupted",
+    "reason": "Acceptance run stopped before the 100-cycle target; only completed cycles are counted.",
+    "normal_test_process_exit": false,
+    "network_failures_observed_before_interruption": 0
+  },
+  "final_quit_scenarios_passed": 8,
+  "synthetic_payload_sizes": {
+    "IPv4": [
+      1,
+      64,
+      512,
+      1200,
+      1232,
+      1400,
+      1452,
+      1472
+    ],
+    "IPv6": [
+      1,
+      64,
+      512,
+      1200,
+      1232,
+      1400,
+      1452
+    ],
+    "result": "pass",
+    "physical_internet_mtu_test": false
+  },
+  "regressions_and_quic_gate_sanitizers": "pass",
+  "dmg_sha256": "ae73e30f3fde217f72ca7037b926094f27c0e27dd5dbb8f4e16b48c94572f9a4",
+  "limits": [
+    "No known blocked QUIC path tested",
+    "No public IPv6 route on the test network",
+    "Fixed TTL 8 is not ISP calibrated",
+    "No artificial loss or MTU blackhole test",
+    "No 24-hour soak or independent security audit",
+    "Ad-hoc signed, not Apple-notarized"
+  ]
+}

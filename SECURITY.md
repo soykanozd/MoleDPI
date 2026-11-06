@@ -1,6 +1,6 @@
-# Experimental security status
+# Security and trust boundaries
 
-MoleDPI changes temporary network configuration and runs a root-owned helper. Treat this pre-release as experimental. Independent security review and notarization remain pending.
+MoleDPI changes temporary network configuration and runs a root-owned helper. Release status does not constitute a security audit. Independent security review and Apple notarization remain pending.
 
 Do not publish credentials, packet captures or personal network data in an issue. Report a reproducible, sanitized description through GitHub Issues. Never upload passwords or tokens.
 

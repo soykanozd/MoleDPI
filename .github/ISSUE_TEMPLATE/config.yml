@@ -2,4 +2,4 @@ blank_issues_enabled: true
 contact_links:
   - name: Install and limitations / Kurulum ve sınırlar
     url: https://github.com/soykanozd/MoleDPI/blob/main/README-TR.md
-    about: Read installation guidance, experimental status and support limitations first.
+    about: Read installation guidance, verified scope and support limitations first.

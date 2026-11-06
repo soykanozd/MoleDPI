@@ -24,11 +24,14 @@ MoleDPI kendi Swift kaynakları, ayrıcalıklı PF yardımcısı ve betikleri: G
 | SpoofDPI-Turkiye | `1ee03b200c0991e809b24e5c69bde8d0d22638a4` | MIT |
 | darkware-zapret | `1d9834a5716d65b6140df24dd64fec350d461bb9` | MIT üst proje; motorların ayrı lisansları var |
 
-ByeDPI Android, onun MIT lisanslı ByeDPI C alt modülü ve hev-socks5-tunnel kaynakları da mimari araştırma için incelendi. Bunlar bu uygulamaya veya kaynak arşivine eklenmedi. GPL lisanslı bir arayüzün MIT lisanslı motor kullanması, bütün bu projelerin aynı lisansa sahip olduğu anlamına gelmez.
+ByeDPI Android mimari referans olarak incelendi; Android arayüz kodu paketlenmez. MIT lisanslı ByeDPI C motoru ve HEV tüneli aşağıda belirtilen revizyonlarla kaynak koddan derlenip paketlenir. GPL lisanslı bir arayüzün MIT lisanslı motor kullanması, bütün bu projelerin aynı lisansa sahip olduğu anlamına gelmez.
 
 Kaynak/ikili dağıtırken MoleDPI'ın ilgili tam kaynak kodunu, derleme betiklerini, bu bildirimleri ve upstream lisanslarını koru. Bu arşiv kaynakları ve paketleme betiklerini birlikte sunar; uygulama paketinde de lisans dosyaları bulunur.
 
 epoll-shim uyumluluk kodu için Jan Kokemüller’in MIT bildirimi de pakete eklenmiştir (jiixyj/epoll-shim, lisans karşılaştırması 18159584bb3d17e601b9315a7398ace018251bdc). Bu kimlik lisansın alındığı kaynaktır; zapret içindeki eski uyarlamanın birebir revizyonu olarak kullanılmaz. uthash BSD-1-Clause, kavl MIT ve macos/sys/tree.h içindeki BSD bildirimi ilgili kaynaklarda yer alır.
 
-## Experimental QUIC components
+## Bundled QUIC components
 ByeDPI e2684772fbda45f2ff4fc220922a010370534216 (MIT), with the documented macOS shutdown patch and a local QUIC Initial gate, and HEV SOCKS tunnel 21bb3d77e64ad5a413d4d851b9f4cacf2098cd77 (MIT), plus its pinned MIT/BSD dependencies, are source-built and bundled. Full sources are in vendor/byedpi and vendor/hev. Original notices are preserved there and in Experimental/UDP/Licenses. These are local processes, not remote VPN services.
+
+## Optional development test dependencies
+`Checks/http3_acceptance.py` is original GPL-3.0-only test code using the public aioquic API. aioquic 1.3.0 (BSD-3-Clause) and its Python dependencies are installed only into a developer-created, ignored virtual environment. They are not embedded in the DMG, source archive or application and are not used at runtime. The tests request a public WebP test image and verify its digest; no image file is redistributed.

@@ -15,7 +15,7 @@ body:
     id: results
     attributes:
       label: Results and reproduction steps
-      description: Separate HTTPS access, reconnect, physical sleep/wake, Wi-Fi changes, install and cleanup. Mark anything else untested. UDP/QUIC bypass is not supported.
+      description: Separate HTTPS access, reconnect, physical sleep/wake, Wi-Fi changes, install and cleanup. Mark anything else untested. Separate HTTP/3 over UDP/443 from other UDP. State whether a real block was tested; ordinary access is not proof of bypass.
     validations:
       required: true
   - type: checkboxes

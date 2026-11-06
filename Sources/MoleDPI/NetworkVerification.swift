@@ -2,10 +2,52 @@
 import Foundation
 import Network
 import SystemConfiguration
+import Darwin
 
 // Opt-in integration check executed by the actual installed, authenticated client.
 // No caller-controlled destinations, PF rules, worker arguments or executable paths.
 enum NetworkVerification {
+    // Opt-in fixed-policy session for external HTTP/3 acceptance tests. The caller
+    // can only request a normal connection and stop it; no rules/paths are supplied.
+    @MainActor static func quicSession() async -> Int32 {
+        let engine = PFConnection()
+        let model = Model(engine:engine, monitorNetwork:false)
+        let originalFlags = fcntl(STDIN_FILENO, F_GETFL)
+        guard originalFlags >= 0, fcntl(STDIN_FILENO,F_SETFL,originalFlags | O_NONBLOCK) == 0 else { return 1 }
+        defer { _ = fcntl(STDIN_FILENO,F_SETFL,originalFlags) }
+        do {
+            let config = try Data(contentsOf:URL(fileURLWithPath:"/etc/pf.conf"))
+            let proxy = SCDynamicStoreCopyProxies(nil) as NSDictionary?
+            model.connect(); await model.task?.value
+            guard model.state == .on, model.quicActive == true else { throw RoutingError.message("QUIC session is unavailable.") }
+            print("QUIC_SESSION_READY"); fflush(stdout)
+            let deadline = Date().addingTimeInterval(900)
+            var byte:UInt8 = 0
+            while Date() < deadline {
+                let received = read(STDIN_FILENO,&byte,1)
+                if received == 0 || received > 0 { break }
+                guard errno == EAGAIN || errno == EWOULDBLOCK else { throw RoutingError.message("Verification input failed.") }
+                guard model.state == .on else { throw RoutingError.message("The verification session stopped.") }
+                try await Task.sleep(nanoseconds:100_000_000)
+            }
+            model.disconnect(); await model.task?.value
+            let settle = Date().addingTimeInterval(3)
+            while (SCDynamicStoreCopyProxies(nil) as NSDictionary?) != proxy && Date() < settle {
+                try await Task.sleep(nanoseconds:50_000_000)
+            }
+            guard model.state == .off, !model.recoveryNeeded,
+                  try Data(contentsOf:URL(fileURLWithPath:"/etc/pf.conf")) == config,
+                  (SCDynamicStoreCopyProxies(nil) as NSDictionary?) == proxy else { throw RoutingError.message("Verification restoration failed.") }
+            print("PASS QUIC session stopped and network restored"); fflush(stdout)
+            return 0
+        } catch {
+            model.beginShutdown()
+            do { try await model.waitForShutdown() }
+            catch { print("FAILED verification cleanup requires attention") }
+            print("FAILED QUIC verification: " + FriendlyError.message(error))
+            return 1
+        }
+    }
     // Real engine and HTTPS, with controller events injected. This does not
     // physically switch Wi-Fi or put the computer to sleep.
     @MainActor static func recovery() async -> Int32 {
@@ -69,7 +111,7 @@ enum NetworkVerification {
             queue.asyncAfter(deadline:.now()+8) { finish(false) }
         }
     }
-    @MainActor static func run(encryptedDNS: Bool = false, fallback: Bool = false) async -> Int32 {
+    @MainActor static func run(encryptedDNS: Bool = false, fallback: Bool = false, endurance: Bool = false) async -> Int32 {
         let engine = PFConnection(requireDNSRecovery: encryptedDNS)
         let targets = ["example.com", "discord.com", "www.roblox.com"].map { SiteCheck(host: $0, name: $0) }
         do {
@@ -77,10 +119,12 @@ enum NetworkVerification {
             let proxy = SCDynamicStoreCopyProxies(nil) as NSDictionary?
             _ = try await ServiceClient.prepare()
             let model = Model(engine: engine, sites: targets)
-            for cycle in 1...((encryptedDNS || fallback) ? 2 : 10) {
+            for cycle in 1...(endurance ? 100 : ((encryptedDNS || fallback) ? 2 : 10)) {
+                let started = DispatchTime.now().uptimeNanoseconds
                 model.connect()
                 await model.task?.value
                 guard model.state == .on else { throw RoutingError.message(model.detail) }
+                print(String(format:"MEASURE connect_ms %.2f",Double(DispatchTime.now().uptimeNanoseconds-started)/1_000_000)); fflush(stdout)
                 let sites = model.sites
                 let status = await engine.sessionStatusForTesting()
                 if engine.requestsQUIC, let status,

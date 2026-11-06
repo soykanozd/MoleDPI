@@ -13,4 +13,4 @@ HEV submodule pins come from its pinned tree. Full notices are kept in `Licenses
 
 Architecture reference: [ByeDPI Android](https://github.com/dovecoteescapee/ByeDPIAndroid). No Android code or binaries are copied. [Zapret macOS documentation](https://github.com/bol-van/zapret/blob/master/docs/bsd.en.md#macos) explains why its dvtws packet-diversion backend cannot simply be enabled in the existing macOS tpws app.
 
-If lab binaries are distributed later, preserve these notices and supply the complete matching source of the lab, local patches and all linked dependencies with exact submodule revisions. The current public application continues to bundle its original tpws engine; these lab binaries are not in its DMG.
+The public application bundles source-built ByeDPI and HEV alongside tpws. Complete corresponding source, local patches, pinned dependencies and original notices are supplied in the source archive and app bundle. The standalone lab remains a separate opt-in test harness.

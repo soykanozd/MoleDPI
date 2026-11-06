@@ -1,6 +1,6 @@
 # Contributing to MoleDPI
 
-MoleDPI is experimental. Contributions should improve verified behavior without promising universal access, anonymity or unsupported UDP functionality.
+Contributions should improve verified behavior without promising universal access, anonymity or unsupported UDP functionality.
 
 ## Report a reproducible issue
 Use the issue templates. Include app version, macOS version, CPU family, steps, expected behavior and observed behavior. General descriptions such as Wi-Fi or Ethernet are enough; never include network names, addresses, credentials or browsing history. Review diagnostics before sharing. Avoid raw logs, packet captures or unredacted screenshots.

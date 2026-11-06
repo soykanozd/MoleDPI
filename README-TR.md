@@ -1,6 +1,6 @@
 # MoleDPI — macOS için yerel DPI aşma
 
-**Deneysel yazılım: hatalar, bağlantı kesintileri ve erişim sorunları olabilir.**
+**Ağ uyumluluğu sağlayıcıya ve filtreleme yöntemine bağlıdır. Hata ve kesinti olabilir; doğrulanan kapsam aşağıda açıklanır.**
 
 MoleDPI, Apple Silicon Mac'lerde yerel TCP/TLS tekniklerini deneyen ücretsiz, açık kaynak bir menü çubuğu uygulamasıdır. VPN sunucusu, hesap veya abonelik gerektirmez. Uygulamanın arayüzü İngilizcedir.
 
@@ -29,11 +29,11 @@ Apple Silicon işlemcili Mac ve macOS 13 veya üzeri hedeflenir. Eski macOS sür
 
 ## Gerçek sınırlar ve gizlilik
 
-Bu araç VPN veya anonimlik hizmeti değildir; genel IP adresini gizlemez. DPI işlemesini TCP 80/443 üzerinde yapar. v1.1.0-beta genel internete giden UDP/443 için deneysel QUIC işlemesi ekler; diğer UDP trafiği normal ağ yolunu kullanır. Ağ yolları erişilebiliyorsa ses, ekran paylaşımı ve oyunlar çalışabilir. Bu, bir UDP engelinin aşıldığı anlamına gelmez. [UDP davranışı ve test kapsamı](docs/UDP.md) belgesine bak. Connected, belirli HTTPS kontrollerinin ve ağ motoru doğrulamasının geçtiğini gösterir; bütün internet için garanti vermez.
+Bu araç VPN veya anonimlik hizmeti değildir; genel IP adresini gizlemez. DPI işlemesini TCP 80/443 üzerinde yapar. v1.2.0 genel internete giden UDP/443 için QUIC işlemesi içerir; diğer UDP trafiği normal ağ yolunu kullanır. Ağ yolları erişilebiliyorsa ses, ekran paylaşımı ve oyunlar çalışabilir. Bu, bir UDP engelinin aşıldığı anlamına gelmez. [UDP davranışı ve test kapsamı](docs/UDP.md) belgesine bak. Connected, belirli HTTPS kontrollerinin ve ağ motoru doğrulamasının geçtiğini gösterir; bütün internet için garanti vermez.
 
 Gerekirse yalnızca kaynak kodda tanımlı sınırlı alan adları için Quad9 üzerinden HTTPS ile DNS kurtarması kullanılır. Quad9 bu sorguları görebilir; diğer DNS trafiği sistem ayarlarını izler. Uygulama tarama geçmişi veya trafik içeriği kaydetmez; tanılama raporlarını kendiliğinden göndermez. İsteğe bağlı güncelleme kontrolünde GitHub istek IP'sini görebilir.
 
-Fiziksel uyku/uyanma, Wi-Fi değişimi, temiz cihazda kurulum/kaldırma, uzun süreli kararlılık ve bağımsız güvenlik incelemesi henüz tamamen doğrulanmamıştır. Teknik ayrıntılar ve lisanslar için [English README](README.md), [test kapsamı](RELEASE-TESTS.md) ve [GPL-3.0 lisansı](LICENSE) dosyalarına bak.
+TCP’ye geri dönemeyen HTTP/3 istemcisiyle gerçek dosya aktarımı, veri özeti karşılaştırması, paralel istekler ve boşta bekleyip devam etme sınanır. Bu ağda genel IPv6 çıkışı ve gerçek engellenmiş QUIC hedefi bulunmadığından bunlar için başarı iddiası yoktur. Fiziksel uyku/uyanma, Wi-Fi değişimi, temiz cihazda kurulum/kaldırma, 24 saat ve üzeri kararlılık ve bağımsız güvenlik incelemesi henüz tamamen doğrulanmamıştır. Teknik ayrıntılar ve lisanslar için [English README](README.md), [test kapsamı](RELEASE-TESTS.md) ve [GPL-3.0 lisansı](LICENSE) dosyalarına bak.
 
 ## Sorun bildir
 

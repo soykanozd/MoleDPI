@@ -4,12 +4,12 @@ title: "[Bug]: "
 body:
   - type: markdown
     attributes:
-      value: "MoleDPI is experimental. Do not post passwords, tokens, IP addresses, network names, browsing history or unredacted screenshots. / Kişisel ağ bilgilerini paylaşmayın."
+      value: "Network compatibility varies. Do not post passwords, tokens, IP addresses, network names, browsing history or unredacted screenshots. / Kişisel ağ bilgilerini paylaşmayın."
   - type: input
     id: version
     attributes:
       label: MoleDPI version
-      placeholder: v1.0.1
+      placeholder: v1.2.0
     validations:
       required: true
   - type: input

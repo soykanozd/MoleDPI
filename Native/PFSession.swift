@@ -253,7 +253,7 @@ final class SignalFlag: @unchecked Sendable {
                     if let data = try? Data(contentsOf:file), let object = try? JSONSerialization.jsonObject(with:data) as? [String:Any], object["phase"] as? String == "active" { udpReady = true; break }
                     Thread.sleep(forTimeInterval:0.03)
                 }
-                guard udpReady else { throw Failure(message:"Experimental UDP engine did not become ready.") }
+                guard udpReady else { throw Failure(message:"UDP engine did not become ready.") }
                 } catch {
                     guard stopUDP() else { throw Failure(message:"QUIC cleanup failed; TCP fallback is unsafe.") }
                 }
