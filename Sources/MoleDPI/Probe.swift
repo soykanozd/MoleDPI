@@ -11,11 +11,12 @@ struct Probe {
     static func check(host: String, using transport: Transport, address: String? = nil) async -> Bool {
         await failure(host: host, using: transport, address: address) == nil
     }
-    static func failure(host: String, using transport: Transport, address: String? = nil) async -> ConnectionIssue? {
+    static func failure(host: String, using transport: Transport, address: String? = nil, acceptsHTTPError: Bool = false) async -> ConnectionIssue? {
         let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/curl")
         let proxy: String
         switch transport { case .direct: proxy = ""; case .http: proxy = "http://127.0.0.1:18080"; case .socks: proxy = "socks5h://127.0.0.1:18081" }
-        p.arguments = ["--disable", "--silent", "--fail", "--output", "/dev/null", "--connect-timeout", "5", "--max-time", "10", "--noproxy", proxy.isEmpty ? "*" : "", "--proxy", proxy, "https://\(host)/"]
+        p.arguments = ["--disable", "--silent", "--output", "/dev/null", "--connect-timeout", "5", "--max-time", "10", "--noproxy", proxy.isEmpty ? "*" : "", "--proxy", proxy, "https://\(host)/"]
+        if !acceptsHTTPError { p.arguments?.append("--fail") }
         if let address {
             p.arguments?.append(contentsOf: ["--connect-to", "\(host):443:\(address):443"])
         }

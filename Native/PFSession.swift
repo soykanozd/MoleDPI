@@ -10,18 +10,9 @@ struct Failure: LocalizedError {
     var errorDescription: String? { message }
 }
 struct Result { let code: Int32; let text: String }
-func command(_ executable: String, _ args: [String], input: String? = nil) throws -> Result {
-    let p = Process(); p.executableURL = URL(fileURLWithPath: executable); p.arguments = args
-    let output = Pipe(); p.standardOutput = output; p.standardError = output
-    let finished = DispatchSemaphore(value: 0)
-    p.terminationHandler = { _ in finished.signal() }
-    var writer: Pipe?
-    if let input { let pipe = Pipe(); writer = pipe; p.standardInput = pipe; try p.run(); pipe.fileHandleForWriting.write(Data(input.utf8)); try pipe.fileHandleForWriting.close() }
-    else { p.standardInput = FileHandle.nullDevice; try p.run() }
-    _ = writer
-    // Outputs here are small PF configuration/status messages, never packet data.
-    let data = output.fileHandleForReading.readDataToEndOfFile(); finished.wait()
-    return Result(code: p.terminationStatus, text: String(decoding: data, as: UTF8.self))
+func command(_ executable: String, _ args: [String], input: String? = nil, timeout: TimeInterval = 5) throws -> Result {
+    let result = try BoundedCommand.run(executable,args,input:input,timeout:timeout)
+    return Result(code:result.0,text:result.1)
 }
 let privilegedDirectory = "/Library/PrivilegedHelperTools/local.moledpi"
 let pfctl = "/sbin/pfctl"
@@ -69,14 +60,12 @@ final class SignalFlag: @unchecked Sendable {
             guard lstat(url.path, &st) == 0, st.st_uid == 0, st.st_mode & S_IFMT == S_IFREG, st.st_mode & 0o022 == 0, st.st_size < 32768,
                   let journal = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any],
                   (journal["uid"] as? NSNumber)?.uint32Value == uid else { throw Failure(message: "Trusted PF recovery record not found.") }
-            guard try command(privilegedDirectory+"/moledpi-udp",["--recover",uuid.uuidString]).code == 0 else { throw Failure(message:"UDP cleanup could not be verified.") }
-            if let pid = (journal["enginePID"] as? NSNumber)?.int32Value, pid > 1 {
-                var buffer = [UInt8](repeating:0,count:4096)
-                let size = proc_pidpath(pid,&buffer,UInt32(buffer.count))
-                if size > 0 && String(decoding:buffer.prefix(Int(size)).prefix(while:{$0 != 0}),as:UTF8.self) == privilegedDirectory+"/tpws" { kill(pid,SIGTERM) }
-            }
+            guard try command(privilegedDirectory+"/moledpi-udp",["--recover",uuid.uuidString],timeout:20).code == 0 else { throw Failure(message:"UDP cleanup could not be verified.") }
             let emptied = try command(pfctl, ["-a", anchor(uid), "-f", "-"], input: "")
             guard emptied.code == 0 else { throw Failure(message: "Could not clear MoleDPI PF rules.") }
+            if let pid = (journal["enginePID"] as? NSNumber)?.int32Value {
+                guard BoundedCommand.stop(pid:pid,executable:privilegedDirectory+"/tpws") else { throw Failure(message:"Could not verify that the network engine stopped.") }
+            }
             if let token = journal["pfToken"] as? String {
                 guard !token.isEmpty, token.count <= 32, token.utf8.allSatisfy({ (48...57).contains($0) }) else { throw Failure(message: "Invalid PF reference.") }
                 let released = try command(pfctl, ["-X", token])
@@ -113,7 +102,7 @@ final class SignalFlag: @unchecked Sendable {
         }
         try secureRootDirectory("/var/run/moledpi")
         let dir = "/var/run/moledpi/\(tokenString)"
-        guard mkdir(dir, 0o755) == 0 else { throw Failure(message: "Oturum zaten mevcut.") }
+        guard mkdir(dir, 0o755) == 0 else { throw Failure(message: "The session already exists.") }
         let stateURL = URL(fileURLWithPath: dir + "/status.json")
         let engine = Process()
         let udp = Process()
@@ -152,13 +141,10 @@ final class SignalFlag: @unchecked Sendable {
         func stopUDP() -> Bool {
             var ok = true
             if udp.isRunning {
-                udp.terminate()
-                let deadline = Date().addingTimeInterval(4)
-                while udp.isRunning && Date() < deadline { Thread.sleep(forTimeInterval:0.05) }
-                if udp.isRunning { kill(udp.processIdentifier,SIGKILL); udp.waitUntilExit() }
+                if !BoundedCommand.stop(pid:udp.processIdentifier,executable:privilegedDirectory+"/moledpi-udp",grace:4) { ok = false }
             }
             if profile >= 6 {
-                do { if try command(privilegedDirectory+"/moledpi-udp",["--recover",tokenString]).code != 0 { ok = false } }
+                do { if try command(privilegedDirectory+"/moledpi-udp",["--recover",tokenString],timeout:20).code != 0 { ok = false } }
                 catch { ok = false }
             }
             udpReady = false
@@ -173,16 +159,12 @@ final class SignalFlag: @unchecked Sendable {
             if loaded {
                 do {
                     let result = try command(pfctl, ["-a", name, "-f", "-"], input: "")
-                    ok = ok && result.code == 0
-                } catch { ok = false }
+                    guard result.code == 0 else { return false }
+                } catch { return false }
             }
             if !stopUDP() { ok = false }
             if engine.isRunning {
-                engine.terminate()
-                let deadline = Date().addingTimeInterval(2)
-                while engine.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
-                if engine.isRunning { kill(engine.processIdentifier, SIGKILL) }
-                engine.waitUntilExit()
+                if !BoundedCommand.stop(pid:engine.processIdentifier,executable:privilegedDirectory+"/tpws") { ok = false }
             }
             if let token = pfToken {
                 do { let result = try command(pfctl, ["-X", token]); if result.code == 0 { pfToken = nil } else { ok = false } } catch { ok = false }
@@ -202,7 +184,7 @@ final class SignalFlag: @unchecked Sendable {
             guard !existing.text.contains("route-to"), !existingNAT.text.contains("rdr pass") else { throw Failure(message: "Another MoleDPI PF session exists.") }
             let syntax = try command(pfctl, ["-n", "-a", name, "-f", "-"], input: rules(uid))
             guard syntax.code == 0 else { throw Failure(message: "PF rules failed validation: \(syntax.text)") }
-            let profiles = [["--split-pos=host+1", "--tlsrec=host+1"], ["--split-pos=2", "--oob=tls"], ["--split-pos=host+1", "--tlsrec=host+1"]]
+            let profiles = TCPStrategy.profiles
             engine.executableURL = URL(fileURLWithPath: privilegedDirectory + "/tpws")
             engine.arguments = ["--user=root", "--bind-addr=127.0.0.1", "--bind-iface6=lo0", "--bind-linklocal=force", "--port=18082", "--maxconn=128", "--filter-tcp=80,443", "--filter-l7=http,tls"] + profiles[profile % 3]
             engine.environment = ["PATH": "/usr/bin:/bin", "MOLEDPI_SPLIT_DELAY_US": profile % 3 == 2 ? "20000" : "0"]

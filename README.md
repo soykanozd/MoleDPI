@@ -22,7 +22,7 @@ A free, open-source macOS menu-bar application for trying local DPI circumventio
 - HTTPS verification, controlled reconnection and connection-help guidance.
 - General-purpose TCP 80/443 processing. QUIC Initial fake-packet processing covers public UDP/443. Other UDP remains direct; anonymity is not provided.
 
-**v1.2.0:** [Download](https://github.com/soykanozd/MoleDPI/releases/download/v1.2.0/MoleDPI.dmg) · [Release notes](https://github.com/soykanozd/MoleDPI/releases/tag/v1.2.0) · [Verification results](RELEASE-TESTS.md). Public UDP/443 is processed; other UDP stays direct.
+**v1.2.1:** [Download](https://github.com/soykanozd/MoleDPI/releases/download/v1.2.1/MoleDPI.dmg) · [Release notes](https://github.com/soykanozd/MoleDPI/releases/tag/v1.2.1) · [Verification results](RELEASE-TESTS.md). Public UDP/443 is processed; other UDP stays direct.
 
 ## Download and install
 
@@ -50,7 +50,9 @@ First installation and a changed application build may require administrator app
 
 ## How it works
 
-MoleDPI tests local TCP/TLS splitting strategies, then uses a restricted helper and macOS PF to process the current user's public TCP traffic on ports 80 and 443. Connected requires HTTPS checks, an active PF session and a positive packet count. This verifies specific control destinations rather than every website.
+MoleDPI tests local TCP/TLS splitting strategies, then uses a restricted helper and macOS PF to process the current user's public TCP traffic on ports 80 and 443. Connected requires HTTPS page checks plus API/CDN TLS transport checks, an active PF session and a positive packet count. An authenticated 403/404 from a transport-only check proves a secure response, not that an account action or game session works. This verifies specific control destinations rather than every website.
+
+Partial check failures display **Limited Access** with an amber indicator; they are no longer hidden by one successful control. The OOB strategy uses ordinary splitting for a CDN suffix where OOB caused reproduced timeouts.
 
 The controller tolerates isolated health-check failures and attempts controlled recovery after a worker failure. Reconnection uses bounded backoff, pauses new worker attempts while offline, and stops when you choose Disconnect or Quit. Reopening the app never automatically connects.
 
@@ -115,7 +117,7 @@ Reproducible bug reports, sanitized compatibility results, documentation improve
 
 If MoleDPI is useful to you, a GitHub star or sharing the repository link can help others discover it. Please keep the verified scope and support limitations alongside any recommendation.
 
-## UDP/443 integration (v1.2.0)
+## UDP/443 integration (v1.2.1)
 Connect now starts source-built ByeDPI and a local HEV utun alongside the existing TCP engine. Only this user's public UDP/443 is routed through it. Fake packets are restricted to plausible QUIC v1/v2 Initial packets; unknown UDP/443 payloads are relayed without fake injection. The proxy drops to the nobody account. Private/LAN destinations, other users and other UDP ports are excluded. No remote VPN server, paid API or login is used. Default routes and DNS preferences are preserved.
 
 The backend is joined on Disconnect/Quit; independent journal-based recovery handles worker loss. The fixed fake TTL is 8, not an ISP-calibrated strategy. Real HTTP/3 acceptance tests use no TCP fallback and verify complete response bodies, parallel streams, concurrent connections and idle/resume. A successful transfer does not prove that a real block was bypassed. No real ISP-blocked QUIC path was available. Public IPv6 internet access, broad macOS compatibility, artificial packet loss/MTU blackholes and universal application access are not certified. See [measured results](RELEASE-TESTS.md).

@@ -23,11 +23,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>local.moledpi.app</string>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
 <key>CFBundleIconFile</key><string>MoleDPI.icns</string>
-<key>CFBundleVersion</key><string>120</string>
+<key>CFBundleVersion</key><string>121</string>
 <key>CFBundleName</key><string>MoleDPI</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.2.0</string>
-<key>MoleReleaseTag</key><string>v1.2.0</string>
+<key>CFBundleShortVersionString</key><string>1.2.1</string>
+<key>MoleReleaseTag</key><string>v1.2.1</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
@@ -58,4 +58,5 @@ for folder in ['Sources','Native','vendor','scripts','Checks','Tests','Resources
 PYBUILD
 cp README.md BUILDING.md RELEASE-NOTES.md RELEASE-TESTS.md SECURITY.md Package.swift LICENSE NOTICE THIRD-PARTY.md "$SOURCE_DIR/"
 codesign --force --options runtime --sign - "$APP"
+python3 scripts/verify-app.py "$APP"
 printf 'Hazır: %s/dist/MoleDPI.app\n' "$PWD"

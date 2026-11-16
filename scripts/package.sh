@@ -2,6 +2,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 if [[ ${MOLEDPI_SKIP_BUILD:-0} != 1 ]]; then ./scripts/build.sh; fi
+python3 scripts/verify-app.py dist/MoleDPI.app
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 ditto dist/MoleDPI.app "$stage/MoleDPI.app"

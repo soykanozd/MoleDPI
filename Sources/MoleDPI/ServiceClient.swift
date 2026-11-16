@@ -11,6 +11,28 @@ struct WorkerStartRejected: LocalizedError {
     var errorDescription: String? { reason }
 }
 
+// XPC can fail, time out or deliver a delayed reply. Resume its waiter once.
+final class ServiceReply: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void,Error>?
+    private var timeout: DispatchWorkItem?
+    init(_ continuation: CheckedContinuation<Void,Error>) { self.continuation = continuation }
+    func arm(seconds: TimeInterval) {
+        lock.lock()
+        guard continuation != nil else { lock.unlock(); return }
+        let item = DispatchWorkItem { self.finish(RoutingError.message("Network helper reply timed out. Retry cleanup before quitting.")) }
+        timeout = item; lock.unlock()
+        DispatchQueue.global().asyncAfter(deadline:.now()+seconds,execute:item)
+    }
+    func finish(_ error: Error? = nil) {
+        lock.lock()
+        let pending = continuation; continuation = nil
+        let item = timeout; timeout = nil
+        lock.unlock(); item?.cancel()
+        if let error { pending?.resume(throwing:error) } else { pending?.resume() }
+    }
+}
+
 enum ServiceClient {
     static let names = ["moledpi-service", "moledpi-pf", "tpws", "ciadpi", "tunnel-runner", "moledpi-udp"]
     static func hex(_ value: String?, length: Int) throws -> String {
@@ -69,6 +91,10 @@ enum ServiceClient {
           case "$(ls -lde "$d" | head -1 | cut -d' ' -f1)" in *+*) exit 73;; esac
         done
         ! pgrep -x moledpi-pf >/dev/null || exit 75
+        commands=$(ps -axo comm=) || exit 70
+        for n in moledpi-pf moledpi-udp tpws ciadpi tunnel-runner; do
+          if printf '%s\\n' "$commands" | grep -Fqx "/Library/PrivilegedHelperTools/local.moledpi/$n"; then exit 75; fi
+        done
         tmp=$(mktemp -d /private/var/root/moledpi.XXXXXXXX)
         trap 'rm -rf "$tmp"' EXIT
         """ + "\n"
@@ -111,14 +137,16 @@ enum ServiceClient {
     }
     static func request(_ c: NSXPCConnection, session: String, profile: Int?) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let proxy = c.remoteObjectProxyWithErrorHandler { error in continuation.resume(throwing: error) }
+            let pending = ServiceReply(continuation)
+            pending.arm(seconds:profile == nil ? 50 : 10)
+            let proxy = c.remoteObjectProxyWithErrorHandler { error in pending.finish(error) }
             guard let remote = proxy as? PFControl else {
-                continuation.resume(throwing: RoutingError.message("Network helper is unavailable.")); return
+                pending.finish(RoutingError.message("Network helper is unavailable.")); return
             }
             let reply: (String) -> Void = { error in
-                if error.isEmpty { continuation.resume() }
-                else if profile != nil { continuation.resume(throwing: WorkerStartRejected(reason: error)) }
-                else { continuation.resume(throwing: RoutingError.message(error)) }
+                if error.isEmpty { pending.finish() }
+                else if profile != nil { pending.finish(WorkerStartRejected(reason:error)) }
+                else { pending.finish(RoutingError.message(error)) }
             }
             if let profile { remote.start(session, profile: profile, reply: reply) }
             else { remote.repair(session, reply: reply) }

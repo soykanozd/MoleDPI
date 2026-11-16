@@ -10,28 +10,8 @@ final class StopFlag: @unchecked Sendable {
     func set() { lock.lock(); value = true; lock.unlock() }
     var stopped: Bool { lock.lock(); defer { lock.unlock() }; return value }
 }
-final class Output: @unchecked Sendable {
-    let lock = NSLock(); var data = Data()
-    func set(_ data: Data) { lock.lock(); self.data = data; lock.unlock() }
-}
 func run(_ exe: String, _ args: [String], input: String? = nil) throws -> (Int32, String) {
-    let p = Process(); p.executableURL = URL(fileURLWithPath: exe); p.arguments = args
-    let pipe = Pipe(); p.standardOutput = pipe; p.standardError = pipe
-    let output = Output(), drained = DispatchSemaphore(value: 0), exited = DispatchSemaphore(value: 0)
-    p.terminationHandler = { _ in exited.signal() }
-    var writer: Pipe?
-    if input != nil { let stream = Pipe(); writer = stream; p.standardInput = stream }
-    else { p.standardInput = FileHandle.nullDevice }
-    try p.run()
-    DispatchQueue.global().async { output.set(pipe.fileHandleForReading.readDataToEndOfFile()); drained.signal() }
-    if let input, let writer { writer.fileHandleForWriting.write(Data(input.utf8)); try writer.fileHandleForWriting.close() }
-    if exited.wait(timeout: .now() + 3) == .timedOut {
-        if p.isRunning { kill(p.processIdentifier, SIGKILL) }
-        _ = exited.wait(timeout: .now() + 2)
-        throw LabFailure(stage: "command-timeout")
-    }
-    guard drained.wait(timeout: .now() + 1) == .success else { throw LabFailure(stage: "output-timeout") }
-    return (p.terminationStatus, String(decoding: output.data, as: UTF8.self))
+    try BoundedCommand.run(exe,args,input:input,timeout:3)
 }
 func assignedLocal(_ address: String) -> Bool {
     var list: UnsafeMutablePointer<ifaddrs>?
@@ -61,29 +41,29 @@ func assignedLocal(_ address: String) -> Bool {
         let journal = URL(fileURLWithPath:"/var/run/moledpi-udp-"+session+"/private/state.journal")
         var st = stat()
         guard lstat(resources.path,&st) == 0, st.st_uid == 0, st.st_mode & S_IFMT == S_IFDIR, st.st_mode & 0o022 == 0 else { throw LabFailure(stage:"recovery-directory") }
-        guard lstat(journal.path,&st) == 0 else { return }
-        guard st.st_uid == 0, st.st_mode & S_IFMT == S_IFREG, st.st_mode & 0o077 == 0, st.st_size < 4096,
-              let values = try JSONSerialization.jsonObject(with:Data(contentsOf:journal)) as? [String:Any],
-              values["session"] as? String == session else { throw LabFailure(stage:"recovery-journal") }
+        func record() throws -> [String:Any]? {
+            guard lstat(journal.path,&st) == 0 else {
+                if errno == ENOENT { return nil }
+                throw LabFailure(stage:"recovery-journal")
+            }
+            guard st.st_uid == 0, st.st_mode & S_IFMT == S_IFREG, st.st_mode & 0o077 == 0, st.st_size < 4096,
+                  let values = try JSONSerialization.jsonObject(with:Data(contentsOf:journal)) as? [String:Any],
+                  values["session"] as? String == session else { throw LabFailure(stage:"recovery-journal") }
+            return values
+        }
+        guard var values = try record() else { return }
+        // Serialize independent recovery with a still-running guardian. It may
+        // already be cleaning up after losing its TCP parent; never race it.
+        if let pid = (values["guardianPID"] as? NSNumber)?.int32Value {
+            guard pid != getpid(), BoundedCommand.stop(pid:pid,executable:resources.appendingPathComponent("moledpi-udp").path,grace:4) else { throw LabFailure(stage:"recovery-guardian") }
+            guard let latest = try record() else { return }
+            values = latest
+        }
         let anchor = "com.apple/MoleDPI-UDP-" + session
         guard try run("/sbin/pfctl",["-a",anchor,"-f","-"],input:"").0 == 0 else { throw LabFailure(stage:"recovery-rule") }
-        func executable(_ pid: Int32) -> String? {
-            var bytes = [UInt8](repeating:0,count:4096)
-            let size = proc_pidpath(pid,&bytes,UInt32(bytes.count))
-            guard size > 0 else { return nil }
-            return String(decoding:bytes.prefix(Int(size)).prefix(while:{$0 != 0}),as:UTF8.self)
-        }
         for (key,name) in [("tunnelPID","tunnel-runner"),("enginePID","ciadpi")] {
             guard let number = values[key] as? NSNumber else { continue }
-            let pid = number.int32Value, expected = resources.appendingPathComponent(name).path
-            guard pid > 1, executable(pid) == expected else { continue }
-            kill(pid,SIGTERM)
-            let end = Date().addingTimeInterval(2)
-            while executable(pid) == expected && Date() < end { Thread.sleep(forTimeInterval:0.02) }
-            if executable(pid) == expected { kill(pid,SIGKILL) }
-            let gone = Date().addingTimeInterval(2)
-            while executable(pid) == expected && Date() < gone { Thread.sleep(forTimeInterval:0.02) }
-            guard executable(pid) != expected else { throw LabFailure(stage:"recovery-process") }
+            guard BoundedCommand.stop(pid:number.int32Value,executable:resources.appendingPathComponent(name).path) else { throw LabFailure(stage:"recovery-process") }
         }
         if let device = values["device"] as? String {
             guard (200...239).map({"utun"+String($0)}).contains(device) else { throw LabFailure(stage:"recovery-interface") }
@@ -148,7 +128,7 @@ func assignedLocal(_ address: String) -> Bool {
         }
         defer { signals.forEach { $0.cancel() } }
         func journal() -> Bool {
-            var data:[String:Any] = ["session":nonce,"packets":packets]
+            var data:[String:Any] = ["session":nonce,"packets":packets,"guardianPID":getpid()]
             if engine.processIdentifier > 1 { data["enginePID"] = engine.processIdentifier }
             if tunnel.processIdentifier > 1 { data["tunnelPID"] = tunnel.processIdentifier }
             if let device { data["device"] = device }
@@ -238,7 +218,7 @@ func assignedLocal(_ address: String) -> Bool {
             }
             let config = privateDir.appendingPathComponent("udp.yml")
             let addressLine = ipv6 ? "ipv6: \"\(gateway)\"" : "ipv4: \(gateway)"
-            let text = "tunnel:\n  name: \(selected)\n  mtu: 1500\n  \(addressLine)\n  ipv6: fe80::1\nsocks5:\n  address: 127.0.0.1\n  port: 19084\n  udp: udp\nmisc:\n  max-session-count: 32\n  log-level: error\n  udp-read-write-timeout: 2000\n"
+            let text = "tunnel:\n  name: \(selected)\n  mtu: 1500\n  \(addressLine)\n  ipv6: fe80::1\nsocks5:\n  address: 127.0.0.1\n  port: 19084\n  udp: udp\nmisc:\n  max-session-count: 32\n  log-level: error\n  udp-read-write-timeout: 60000\n"
             try Data(text.utf8).write(to:config,options:.atomic); chmod(config.path,0o600)
             tunnel.executableURL = resources.appendingPathComponent("tunnel-runner"); tunnel.arguments = [config.path,"--physical"]
             tunnel.standardOutput = FileHandle.nullDevice; tunnel.standardError = FileHandle.nullDevice; tunnel.standardInput = FileHandle.nullDevice

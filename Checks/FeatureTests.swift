@@ -4,6 +4,8 @@ import Foundation
    func expect(_ value:Bool,_ name:String) throws {
      guard value else { throw RoutingError.message(name) }; print("PASS "+name)
    }
+   try expect(TCPStrategy.profiles[1].contains("--hostlist-exclude-domains=rbxcdn.com") &&
+              TCPStrategy.profiles[1].last == "--split-pos=host+1", "OOB-incompatible CDN uses ordinary splitting")
    try expect(PFConnection.strategyOrder(saved:2)==[2,0,1],"last verified strategy first")
    try expect(PFConnection.strategyOrder(saved:99)==[0,1,2],"invalid stored strategy ignored")
    try expect(ReleaseVersion("v0.10.0-beta")! > ReleaseVersion("v0.9.9-beta")!,"numeric release comparison")
@@ -11,6 +13,24 @@ import Foundation
    try expect(ReleaseVersion("vbroken")==nil,"invalid version rejected")
    try expect(UpdateChecker.safeURL("https://github.com/soykanozd/MoleDPI/releases/tag/v0.9.4-beta") != nil &&
     UpdateChecker.safeURL("https://github.com.attacker.invalid/soykanozd/MoleDPI/releases/tag/x")==nil,"update URL allowlist")
+   for suffix in ["v1.2.1/../evil", "v1.2.1?body=secret", "v1.2.1%2Fextra", "v1.2.1#fragment", "unversioned"] {
+    try expect(UpdateChecker.safeURL("https://github.com/soykanozd/MoleDPI/releases/tag/"+suffix)==nil,"noncanonical update link rejected")
+   }
+   func release(_ tag:String,_ prerelease:Bool=false,_ draft:Bool=false)->[String:Any] {
+    ["tag_name":tag,"prerelease":prerelease,"draft":draft,"html_url":"https://github.com/soykanozd/MoleDPI/releases/tag/"+tag]
+   }
+   let releases=[release("v1.2.1"),release("v2.0.0-beta",true),release("v3.0.0",false,true)]
+   try expect(UpdateChecker.newest(in:releases,current:ReleaseVersion("v1.2.0")!)?.lastPathComponent=="v1.2.1","regular app only offers published regular updates")
+   try expect(UpdateChecker.newest(in:releases,current:ReleaseVersion("v1.2.0-beta")!)?.lastPathComponent=="v2.0.0-beta","beta app retains beta update channel")
+   var mismatch=release("v1.2.1");mismatch["html_url"]="https://github.com/soykanozd/MoleDPI/releases/tag/v9.0.0"
+   try expect(UpdateChecker.newest(in:[mismatch],current:ReleaseVersion("v1.2.0")!)==nil,"release metadata must match its link")
+   do {
+    try await withCheckedThrowingContinuation { (c:CheckedContinuation<Void,Error>) in
+     let reply=ServiceReply(c);reply.arm(seconds:0.02)
+     DispatchQueue.global().asyncAfter(deadline:.now()+0.04) { reply.finish();reply.finish(RoutingError.message("late")) }
+    }
+    try expect(false,"missing helper reply must time out")
+   } catch { try expect(error.localizedDescription.contains("timed out"),"helper timeout resumes once despite late replies") }
    try expect(FriendlyError.message(HelperApprovalDenied()).contains("Permission"),"permission guidance")
    let secret=FriendlyError.message(RoutingError.message("token=secret /private/fixture 192.0.2.1"))
    try expect(!secret.contains("secret") && !secret.contains("192.0.2.1"),"friendly error excludes raw data")

@@ -20,6 +20,24 @@ actor RecoveryFixture: ConnectionEngine {
     }
     func stop() {}
 }
+actor QUICHealthFixture: ConnectionEngine {
+    var blocked: Bool
+    var waiting: CheckedContinuation<Bool?,Never>?
+    init(blocked:Bool = false) { self.blocked = blocked }
+    func block() { blocked = true }
+    func release() { blocked = false; let value = waiting; waiting = nil; value?.resume(returning:true) }
+    func start(targets:[SiteCheck])->[SiteCheck] { targets.map { var item=$0; item.reachable=true; return item } }
+    func health(targets:[SiteCheck])->[SiteCheck]? { targets }
+    func quicStatus() async -> Bool? {
+        if blocked { return await withCheckedContinuation { waiting=$0 } }
+        return true
+    }
+    func stop() { release() }
+}
+actor DelayRecorder {
+    var count=0
+    func sleep(_ nanos:UInt64) async throws { count+=1; try await Task.sleep(nanoseconds:nanos) }
+}
 @main struct NetworkRecoveryTests {
     @MainActor static func main() async throws {
         func expect(_ value: Bool, _ label: String) throws {
@@ -37,6 +55,24 @@ actor RecoveryFixture: ConnectionEngine {
             try expect(ConnectionIssue.curlExit(code) == issue, "curl exit category \(code)")
         }
         try expect(ConnectionIssue.curlExit(0) == nil, "successful HTTPS has no failure")
+        let quic = QUICHealthFixture(), delay = DelayRecorder()
+        let quicModel = Model(engine:quic,monitorNetwork:false,sleep:{ try await delay.sleep($0) })
+        quicModel.connect(); await quicModel.task?.value
+        try await eventually { await delay.count == 1 }
+        await quic.block(); quicModel.refreshHealth()
+        try await eventually { await quic.waiting != nil }
+        quicModel.networkChanged(false); await quic.release()
+        try await eventually { await delay.count >= 2 }
+        try expect(quicModel.recovering && quicModel.issueMessage?.contains("No internet") == true,
+                   "late QUIC health result cannot erase a newer offline event")
+        quicModel.disconnect(); await quicModel.task?.value
+        let startupGate = QUICHealthFixture(blocked:true)
+        let startup = Model(engine:startupGate,monitorNetwork:false)
+        startup.connect()
+        try await eventually { await startupGate.waiting != nil }
+        startup.networkChanged(false); await startupGate.release(); await startup.task?.value
+        try expect(startup.state == .off && startup.recovering,"offline startup cannot publish Connected")
+        startup.disconnect(); await startup.task?.value
         let fixture = RecoveryFixture()
         let model = Model(engine:fixture, monitorNetwork:false)
         model.connect(); await model.task?.value

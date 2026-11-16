@@ -23,6 +23,17 @@ import AppKit
         r='/Library/PrivilegedHelperTools/local.moledpi'
         [ ! -L "$r" ] || exit 73
         if [ -e "$r" ]; then [ "$(stat -f '%u:%Lp' "$r")" = '0:755' ] || exit 73; fi
+        commands=$(ps -axo comm=) || exit 70
+        for n in moledpi-pf moledpi-udp tpws ciadpi tunnel-runner; do
+          if printf '%s\\n' "$commands" | grep -Fqx "$r/$n"; then exit 75; fi
+        done
+        for s in /var/run/moledpi/*/status.json /var/run/moledpi-udp-*/status.json; do
+          [ -f "$s" ] || continue
+          phase=$(plutil -extract phase raw -o - "$s") || exit 74
+          case "$phase" in stopped|failed) ;; *) exit 75;; esac
+          if plutil -extract pfToken raw -o - "$s" >/dev/null 2>&1; then exit 75; fi
+          [ ! -e "${s%/status.json}/private/state.journal" ] || exit 75
+        done
         label=local.moledpi.pf-service
         if launchctl print system/$label >/dev/null 2>&1; then launchctl bootout system/$label; fi
         rm -f /Library/LaunchDaemons/$label.plist
@@ -47,7 +58,7 @@ import AppKit
         } catch {
             let result = NSAlert()
             result.messageText = "Removal could not finish"
-            result.informativeText = "Make sure MoleDPI is disconnected and has quit, then try again. Approve the macOS request if you want to remove the helper."
+            result.informativeText = "Open MoleDPI and finish any pending network cleanup, then Disconnect and Quit before trying again. The helper is kept while a network worker or recovery record still needs it. Approve the macOS request to remove a clean installation."
             result.runModal()
         }
     }

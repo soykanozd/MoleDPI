@@ -1,23 +1,41 @@
-# v1.2.0 verification
+# v1.2.1 verification — 2026-11-16
 
-## Measured before the final package
+Results from the installed Apple Silicon application, with the same executable shipped in the DMG. Full aggregate measurements are in [verification-v1.2.1.json](docs/verification-v1.2.1.json). No personal paths, credentials, traffic contents, account identifiers or raw application logs are published.
 
-A pre-release acceptance build using the unchanged production UDP backend completed 483 actual certificate-verified HTTP/3 requests without TCP fallback. The sustained phase lasted 300 seconds. Four simultaneous test-image transfers totalled 1500916 response bytes and matched the independently obtained HTTPS reference SHA-256. Four concurrent connections with five multiplexed requests each and a five-second idle/resume check passed. Request median was 34.04 ms; slowest was 284.92 ms. These are response timings, not bypass speedup measurements.
+## Reproduced issues and fixes
 
-The app's UDP PF counter increased by 10208. PF/proxy/DNS snapshots matched afterward, the app exited cleanly and no owned processes remained. A separate 60-second run also passed. A missing public IPv6 route was recorded as unavailable, not passed.
+The legacy OOB strategy intermittently failed a public content-CDN TLS handshake while the principal page still worked. In a matched 12-request comparison, legacy OOB returned 3/12 secure responses (mean 3018.94 ms including timeouts); the corrected suffix policy returned 12/12 (mean 65.29 ms). The root returns HTTP 403: this verifies transport, not authorization, content delivery or a game session. The same source-built engine and certificate checks were used for both variants. The opt-in reproduction script is `Checks/cdn_compatibility.py`.
 
-Production-built engines passed synthetic IPv4 UDP payload roundtrips at 1, 64, 512, 1200, 1232, 1400, 1452 and 1472 bytes. Synthetic IPv6 payloads at 1, 64, 512, 1200, 1232, 1400 and 1452 bytes also passed with an assigned local endpoint. These are local packet-pipeline checks, not physical internet MTU/fragmentation or loss tests.
+A baseline Connect/Disconnect run completed only 3 cycles and 4 verified connections before a cleanup/worker-exit race. Cleanup subsequently recovered. The corrected final build completed all 10 cycles. A separate candidate failed a transparent-route check despite passing the local SOCKS probe; the final code cleans up before trying another fixed strategy. No failed strategy is saved as verified.
 
-Controller/parser/restoration regression checks and the production QUIC Initial gate's ASan/UBSan malformed-input checks passed. Prior installed v1.1.1-beta tests passed ten normal cycles, two forced QUIC-start failures preserving TCP and eight Quit scenarios.
+## Final checks
 
-## Final release checks
+| Check | Observed result |
+|---|---|
+| Connect/Disconnect | 10/10 completed, no failed connections or cleanup errors |
+| Connect duration | Mean 4275.71 ms; median 3156.10 ms; slowest 7528.80 ms |
+| Public HTTP/3 | 184 requests; 60-second sustained phase; certificate verification enabled; no TCP fallback |
+| HTTP/3 request latency | Median 30.52 ms; slowest 297.73 ms |
+| Parallel transfers | Four hash-checked transfers; four connections with five streams each; idle/resume passed |
+| HTTP/3 sampled process usage | Peak 23.4% CPU and 74432 KiB RSS; one-second samples |
+| Quit | Eight scenarios passed, including idle, connecting, connected, disconnecting, and engine failure |
+| Client SIGKILL | Watchdog restored the network; owned TCP/UDP/tunnel processes exited |
+| Injected path/wake events | Three cycles with real HTTPS, preserving the same engine session |
+| UDP payload integrity | Synthetic IPv4: 1, 64, 512, 1200, 1232, 1400, 1452, 1472 bytes |
+| Standalone regressions | 71 passed assertions, including partial-health visibility, cancellation, stale results, update links and bounded native commands |
+| QUIC gate | ASan/UBSan checks passed |
+| Distribution | Source/app/DMG privacy scan, signatures, helper hashes, architecture and DMG integrity passed |
 
-The final installed v1.2.0 passed 107 certificate-verified HTTP/3 requests, four complete digest-checked transfers, concurrent streams and five-second idle/resume, with no TCP fallback. Its owned UDP PF counter increased; PF/proxy/DNS restoration and no leftover owned processes were verified. Eight real Quit scenarios passed, including Connecting, Connected, Disconnecting, immediate Quit and engine failure.
+HTTP/3 teardown verified restoration of PF, proxy and DNS configuration and absence of owned processes. Quit checks also verified normal HTTPS afterwards. Transport/API checks now supplement page checks; one successful destination no longer hides partial failures. Partial failures preserve established connections and display Limited Access.
 
-The endurance run completed 62 Connect/Disconnect cycles and verified 63 connections before deliberate interruption. It did **not** complete the 100-cycle target, and its process termination is not counted as a normal clean test exit. No network failure was logged before interruption. Network restoration and no leftover owned processes were checked afterward. Connection median: 1289.56 ms; mean: 1425.11 ms; slowest: 6389.1 ms.
+The incomplete baseline mean was 4275.89 ms over four connections, median 4231.31 ms, slowest 6737.00 ms. This is **not** a complete 10-versus-10 comparison, and the final run checks more destinations. No improvement in overall mean Connect time or controlled CPU/memory reduction is claimed. Retries and direct diagnostic timeouts still account for the slowest connections; the CDN latency improvement is a separate measurement.
 
-The long acceptance run's UDP component hashes are compared with the final build in the [machine-readable report](docs/verification-v1.2.0.json). Installed/frozen app signatures and DMG integrity were verified; privacy scans are performed on source and package before upload. The app bundle's source snapshot contains the earlier pre-package verification text; this source report and release JSON add the final results. No runtime source changes were made after freezing the tested app. Run instructions and limits are in BUILDING.md and docs/UDP.md. Nothing is uploaded automatically.
+`swift test` was unavailable because the installed Command Line Tools do not provide XCTest. Standalone parser, proxy, controller and process tests passed; this is not reported as a passed XCTest run.
 
-## Not verified
+## Limits
 
-No actual ISP-blocked QUIC path was available. Public IPv6 internet access, automatic TTL calibration, artificial loss/MTU blackholes, 24-hour soak, physical Wi-Fi roaming/sleep and broad older-macOS/clean-Mac compatibility are not certified. Independent security review and Apple notarization remain pending. A regular release designation is not evidence that these untested cases passed.
+Some optional remote service endpoints still timed out during exploration. Passing these checks does not establish access to every website, game or voice service. No game-session claim is made. No known ISP-blocked QUIC destination or public IPv6 route was available. Synthetic IPv6 was also skipped on this run because no suitable local endpoint was assigned.
+
+No controlled root-worker crash, physical sleep/Wi-Fi roaming, packet-loss/MTU-blackhole injection, 24-hour soak, clean-Mac uninstall, older-OS certification, independent security audit or Apple notarization is claimed. Normal GitHub release status is not proof that these untested cases passed.
+
+The app contains its complete corresponding runtime source and a preparation report. These final measurements and the standalone CDN comparison script were added to the repository/release after freezing the tested executable; no executable was rebuilt solely to embed post-test results. Earlier evidence remains in `docs/verification-v1.2.0.json`.

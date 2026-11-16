@@ -218,7 +218,7 @@ struct Panel: View {
         switch model.state {
         case .off: return hasError ? "Connection Failed" : "Not Connected"
         case .digging: return "Connecting..."
-        case .on: return "Connected"
+        case .on: return model.accessLimited ? "Limited Access" : "Connected"
         case .emerging: return "Disconnecting..."
         }
     }
@@ -228,7 +228,7 @@ struct Panel: View {
         switch model.state {
         case .off: return hasError ? (model.issueMessage ?? "Connection failed. Please try again.") : "The mole is still above ground."
         case .digging: return "The mole is digging its way..."
-        case .on: return model.quicActive == false ? "Connected using TCP. QUIC is unavailable." : "You're now underground."
+        case .on: return model.accessLimited ? "Some access checks failed. Retry if needed." : model.quicActive == false ? "Connected using TCP. QUIC is unavailable." : "You're now underground."
         case .emerging: return "The mole is returning above ground."
         }
     }
@@ -336,7 +336,7 @@ struct Panel: View {
             }.frame(height: 52)
             AnimatedMole(state: model.recovering ? .digging : model.state).frame(width: 218, height: 121).padding(.top, 30)
             HStack(spacing: 8) {
-                Circle().fill(model.recovering ? .yellow : model.state == .on ? MolePalette.green : model.state == .off ? MolePalette.red : .yellow)
+                Circle().fill(model.recovering || model.accessLimited ? .yellow : model.state == .on ? MolePalette.green : model.state == .off ? MolePalette.red : .yellow)
                     .frame(width: 13, height: 13)
                 Text(title).font(.system(size: 16, weight: .semibold)).lineLimit(1)
             }

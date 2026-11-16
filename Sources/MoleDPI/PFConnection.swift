@@ -17,6 +17,8 @@ struct ConnectClock {
 struct SiteCheck: Identifiable, Sendable {
     let host: String
     let name: String
+    // A verified TLS response (including 403/404) proves transport only.
+    var acceptsHTTPError = false
     var reachable: Bool?
     var direct: Bool?
     var failure: ConnectionIssue?
@@ -37,13 +39,13 @@ extension ConnectionEngine {
 }
 // Manages a source-built tpws probe and an ephemeral privileged PF session.
 // All process ownership and session state are serialized by this actor.
+private struct StrategyVerificationFailure: Error {
+    let profile: Int
+    let issue: ConnectionIssue
+}
 actor PFConnection: ConnectionEngine {
     nonisolated let requestsQUIC = !ProcessInfo.processInfo.arguments.contains("--tcp-only")
-    static let profiles = [
-        ["--split-pos=host+1", "--tlsrec=host+1"],
-        ["--split-pos=2", "--oob=tls"],
-        ["--split-pos=host+1", "--tlsrec=host+1"]
-    ]
+    static let profiles = TCPStrategy.profiles
     static func strategyOrder(saved: Int? = UserDefaults.standard.object(forKey: "MoleDPI.verifiedStrategy.v1") as? Int) -> [Int] {
         guard let saved, profiles.indices.contains(saved) else { return Array(profiles.indices) }
         return [saved] + profiles.indices.filter { $0 != saved }
@@ -77,7 +79,7 @@ actor PFConnection: ConnectionEngine {
             for target in targets {
                 group.addTask {
                     var result = target
-                    result.failure = await Probe.failure(host: target.host, using: transport, address: addresses[target.host])
+                    result.failure = await Probe.failure(host: target.host, using: transport, address: addresses[target.host], acceptsHTTPError: target.acceptsHTTPError)
                     result.reachable = result.failure == nil
                     return result
                 }
@@ -157,6 +159,22 @@ actor PFConnection: ConnectionEngine {
         throw RoutingError.message("Network session startup timed out.")
     }
     func start(targets: [SiteCheck]) async throws -> [SiteCheck] {
+        var candidates = Self.strategyOrder()
+        var lastIssue = ConnectionIssue.accessUnverified
+        // SOCKS success is not proof of transparent routing success. Retry a
+        // different fixed strategy only after the failed session was restored.
+        while !candidates.isEmpty {
+            try Task.checkCancellation()
+            do { return try await startAttempt(targets: targets, candidates: candidates) }
+            catch let failure as StrategyVerificationFailure {
+                lastIssue = failure.issue
+                candidates.removeAll { $0 == failure.profile }
+                if ConnectClock.enabled { print("TIMING strategy.transparent-verification-fallback") }
+            }
+        }
+        throw lastIssue
+    }
+    private func startAttempt(targets: [SiteCheck], candidates: [Int]) async throws -> [SiteCheck] {
         guard !targets.isEmpty else { throw RoutingError.message("No connectivity targets are configured.") }
         let clock = ConnectClock()
         let id = UUID(); generation = id
@@ -181,7 +199,7 @@ actor PFConnection: ConnectionEngine {
                 let relay = DNSRelay(); dnsRelay = relay
                 try await relay.start(); try valid(id)
             }
-            for (orderIndex, profile) in Self.strategyOrder().enumerated() {
+            for (orderIndex, profile) in candidates.enumerated() {
                 try valid(id)
                 let process = Process(); process.executableURL = binary
                 process.arguments = ["--socks", "--bind-addr=127.0.0.1", "--port=18081", "--maxconn=128", "--filter-tcp=80,443", "--filter-l7=http,tls"] + Self.profiles[profile]
@@ -254,7 +272,10 @@ actor PFConnection: ConnectionEngine {
                 try valid(id); try await Task.sleep(nanoseconds: 150_000_000)
             }
             guard (readStatus()?["packets"] as? NSNumber)?.uint64Value ?? 0 > 0, results.allSatisfy({ $0.reachable == true }), readStatus()?["phase"] as? String == "active", service != nil else {
-                throw results.allSatisfy({ $0.reachable == true }) ? ConnectionIssue.localEngine : ConnectionIssue.summarize(results)
+                if !results.allSatisfy({ $0.reachable == true }) {
+                    throw StrategyVerificationFailure(profile: profile % 3, issue: ConnectionIssue.summarize(results))
+                }
+                throw ConnectionIssue.localEngine
             }
             UserDefaults.standard.set(profile % 3, forKey: "MoleDPI.verifiedStrategy.v1")
             clock.mark("engine.counter-verified")
@@ -294,7 +315,10 @@ actor PFConnection: ConnectionEngine {
         while Date() < deadline {
             if let phase = readStatus()?["phase"] as? String {
                 if phase == "stopped" || phase == "failed" { break }
-                if phase == "cleanup_failed" { try await repair(); break }
+                // The worker publishes cleanup_failed just before exiting.
+                // Give the daemon's automatic repair the remaining grace period;
+                // requesting repair immediately races its still-live worker.
+                // A terminal journal ends this wait as soon as recovery finishes.
             }
             if statusURL == nil || (service == nil && readStatus() == nil) { break }
             // Cleanup must still yield when called by a cancelled startup task.

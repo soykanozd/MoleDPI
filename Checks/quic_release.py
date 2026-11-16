@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 
+import http3_acceptance
 from http3_acceptance import run
 
 APP = "/Applications/MoleDPI.app/Contents/MacOS/MoleDPI"
@@ -61,7 +62,7 @@ async def traffic(duration):
                 report = await run(family, duration)
             except Exception as error:
                 report = {"family": "IPv6" if family == socket.AF_INET6 else "IPv4", "result": "fail",
-                          "failure_type": type(error).__name__, "tcp_fallback": False}
+                          "failure_type": type(error).__name__, "stage":http3_acceptance.PHASE, "tcp_fallback": False}
             reports.append(report)
             print(json.dumps(report), flush=True)
     finally:
@@ -116,13 +117,16 @@ def main():
         # A timeout is a failure; do not kill arbitrary workers or count forced exit as success.
         try:
             output, _ = proc.communicate(timeout=45)
+            Path(".build/quic-client-output.log").write_text(output)
             report["clean_exit"] = proc.returncode == 0 and "PASS QUIC session stopped and network restored" in output
         except subprocess.TimeoutExpired:
             report["clean_exit"] = False
         deadline = time.monotonic() + 8
         while time.monotonic() < deadline and (configuration() != before or owned_usage()["processes"]):
             time.sleep(.15)
-        report["network_restored"] = configuration() == before
+        after = configuration()
+        report["network_restored_components"] = dict(zip(["pf", "proxy", "dns"], [a == b for a, b in zip(after, before)]))
+        report["network_restored"] = after == before
         report["no_owned_processes_left"] = owned_usage()["processes"] == 0
     report["result"] = "pass" if (not report.get("driver_failure_type") and report["clean_exit"] and
         report["network_restored"] and report["no_owned_processes_left"] and

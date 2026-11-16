@@ -30,6 +30,7 @@ actor Engine: ConnectionEngine {
     func failAll() { allFailed = true }
     func failOne() { failed = true }
     func crash() { dead = true }
+    func restore() { failed = false; allFailed = false }
 }
 @main struct Stability {
     @MainActor static func main() async throws {
@@ -47,6 +48,10 @@ actor Engine: ConnectionEngine {
         await e.failOne()
         try await Task.sleep(nanoseconds:20_000_000)
         try expect(await e.starts == 1 && m.state == .on,"one endpoint failure leaves the running engine intact")
+        try expect(m.accessLimited && m.issueMessage != nil, "partial access is visible instead of a false all-clear")
+        await e.restore()
+        try await Task.sleep(nanoseconds:20_000_000)
+        try expect(!m.accessLimited && m.issueMessage == nil, "full successful checks clear limited access")
         m.showDetails = true; m.showDetails = false
         try expect(m.wantsConnection && m.state == .on,"view state does not own connectivity")
         m.networkChanged(false)

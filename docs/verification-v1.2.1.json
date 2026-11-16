@@ -1,0 +1,123 @@
+{
+  "release": "v1.2.1",
+  "date": "2026-11-16",
+  "release_type": "regular",
+  "cdn_transport_comparison": [
+    {
+      "variant": "before",
+      "requests": 12,
+      "transport_successes": 3,
+      "mean_ms": 3018.94,
+      "median_ms": 4003.79,
+      "max_ms": 4007.0,
+      "http_statuses": [
+        "000",
+        "403"
+      ]
+    },
+    {
+      "variant": "after",
+      "requests": 12,
+      "transport_successes": 12,
+      "mean_ms": 65.29,
+      "median_ms": 65.48,
+      "max_ms": 70.48,
+      "http_statuses": [
+        "403"
+      ]
+    }
+  ],
+  "comparison_scope": "Same public CDN root with certificate verification. HTTP 403 confirms TLS transport only; no account or game action. The legacy OOB variant and corrected suffix policy used the same binary.",
+  "before_cycles": {
+    "verified_connections": 4,
+    "completed_cycles": 3,
+    "mean_ms": 4275.89,
+    "median_ms": 4231.31,
+    "slowest_ms": 6737.0,
+    "test_failed": true
+  },
+  "final_cycles": {
+    "verified_connections": 10,
+    "completed_cycles": 10,
+    "mean_ms": 4275.71,
+    "median_ms": 3156.1,
+    "slowest_ms": 7528.8,
+    "test_failed": false
+  },
+  "cycle_comparison_limit": "Baseline stopped after a cleanup failure; not a complete 10-versus-10 speed comparison. Final checks include two additional API/CDN targets. No mean Connect speedup claimed.",
+  "final_http3": {
+    "isp_bypass": "not tested",
+    "physical_wifi_roaming_or_sleep": "not tested",
+    "http3": [
+      {
+        "result": "pass",
+        "family": "IPv4",
+        "protocol": "h3",
+        "certificate_verification": true,
+        "tcp_fallback": false,
+        "requests": 184,
+        "response_bytes": 1500916,
+        "median_ms": 30.52,
+        "slowest_ms": 297.73,
+        "sustained_seconds": 60,
+        "concurrent_connections": 4,
+        "streams_per_connection": 5,
+        "idle_resume_seconds": 5,
+        "mtu_blackhole_or_loss_injection": "not tested",
+        "isp_bypass": "not tested"
+      },
+      {
+        "family": "IPv6",
+        "result": "not_available",
+        "reason": "no public IPv6 route"
+      }
+    ],
+    "sampled_usage": {
+      "peak_sampled_cpu_percent": 23.4,
+      "peak_sampled_rss_kib": 74432,
+      "sample_interval_seconds": 1
+    },
+    "owned_udp_packet_increase": 10666,
+    "clean_exit": true,
+    "network_restored_components": {
+      "pf": true,
+      "proxy": true,
+      "dns": true
+    },
+    "network_restored": true,
+    "no_owned_processes_left": true,
+    "result": "pass"
+  },
+  "quit_scenarios_passed": 8,
+  "standalone_regression_assertions_passed": 71,
+  "quic_gate_asan_ubsan": "pass",
+  "client_crash_watchdog": "pass",
+  "injected_path_wake_with_live_https": "3 cycles passed; no physical network switching",
+  "synthetic_udp_payloads": {
+    "ipv4_bytes": [
+      1,
+      64,
+      512,
+      1200,
+      1232,
+      1400,
+      1452,
+      1472
+    ],
+    "ipv6": "skipped: no assigned non-loopback endpoint on this run",
+    "physical_mtu_loss_test": false
+  },
+  "source_app_dmg_privacy_audit": "pass",
+  "dmg_signature_and_integrity": "pass",
+  "swift_xctest": "unavailable with installed Command Line Tools; standalone tests passed",
+  "dmg_sha256": "2d996808235256e3b0b6008a44a5541dcf56cd3781e87bfc90f0f86297193b65",
+  "limits": [
+    "No claim that every website, game session or voice call works",
+    "Some optional service endpoints still timed out in exploratory checks; no universal access claim",
+    "Initial candidate failed one installed transparent access check; final build completed 10 cycles after fallback and cleanup changes",
+    "No controlled root-worker SIGKILL test in this run; client-crash watchdog was tested",
+    "No known ISP-blocked QUIC path, public IPv6 route, physical Wi-Fi roaming or sleep test",
+    "No 24-hour soak, clean-Mac uninstall, older-macOS certification or independent security audit",
+    "Ad-hoc signed; not Apple-notarized"
+  ]
+}

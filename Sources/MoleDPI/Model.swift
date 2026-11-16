@@ -11,6 +11,7 @@ import AppKit
     @Published var sites: [SiteCheck]
     @Published var showDetails = false
     @Published var quicActive: Bool?
+    @Published private(set) var accessLimited = false
     @Published var diagnostics: String?
     @Published var reportTitle = "Diagnostics"
     private var lastIssue: ConnectionIssue?
@@ -53,7 +54,9 @@ import AppKit
     init(engine: any ConnectionEngine = PFConnection(), sites: [SiteCheck] = [
         SiteCheck(host: "example.com", name: "HTTPS check 1"),
         SiteCheck(host: "discord.com", name: "HTTPS check 2"),
-        SiteCheck(host: "www.roblox.com", name: "HTTPS check 3")
+        SiteCheck(host: "www.roblox.com", name: "HTTPS check 3"),
+        SiteCheck(host: "apis.roblox.com", name: "API transport check", acceptsHTTPError: true),
+        SiteCheck(host: "sc0ak.rbxcdn.com", name: "CDN transport check", acceptsHTTPError: true)
     ], monitorNetwork: Bool = true, healthInterval: UInt64 = 30_000_000_000,
          sleep: @escaping @Sendable (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }) {
         self.engine = engine; self.sites = sites; self.healthInterval = healthInterval; self.sleep = sleep
@@ -156,6 +159,7 @@ import AppKit
             "UDP/443 configured: " + String(engine.requestsQUIC),
             "QUIC routing active: " + (state == .on ? (quicActive.map(String.init) ?? "not verified") : (state == .off && !recoveryNeeded ? "false" : "not verified")),
             "Recovering: " + String(recovering),
+            "Limited access: " + String(accessLimited),
             "Cleanup required: " + String(recoveryNeeded),
             "Verified targets: " + String(sites.filter { $0.reachable == true }.count) + "/" + String(sites.count),
             "Recovery DNS transport: HTTPS (when activated)",
@@ -169,7 +173,8 @@ import AppKit
         if !networkAvailable || sleeping { recovering = true; return }
         let timing = ConnectClock()
         timing.mark("ui.connect")
-        sites = sites.map { SiteCheck(host: $0.host, name: $0.name) }
+        sites = sites.map { SiteCheck(host: $0.host, name: $0.name, acceptsHTTPError: $0.acceptsHTTPError) }
+        accessLimited = false
         state = .digging; detail = "The mole is digging underground."
         timing.mark("ui.digging")
         task = Task {
@@ -177,12 +182,15 @@ import AppKit
                 guard !Task.isCancelled else { return }
                 let checked = try await engine.start(targets: sites)
                 guard !Task.isCancelled else { return }
-                sites = checked
-                quicActive = await engine.quicStatus()
+                let revision = networkRevision
+                let currentQUIC = await engine.quicStatus()
                 guard !Task.isCancelled, wantsConnection, !quitting, state == .digging else { return }
+                guard networkAvailable, !sleeping else { throw ConnectionIssue.offline }
+                guard revision == networkRevision else { throw ConnectionIssue.accessUnverified }
                 guard !checked.isEmpty, checked.allSatisfy({ $0.reachable == true }) else {
                     throw RoutingError.message("Connection could not be verified.")
                 }
+                sites = checked; quicActive = currentQUIC
                 state = .on; detail = "The mole is underground. Tunnel ready!"
                 timing.mark("ui.connected")
                 recovering = false; attempt = 0; completeFailures = 0; lastIssue = nil
@@ -192,7 +200,7 @@ import AppKit
                 guard !Task.isCancelled else { return }
                 do { try await engine.stop() } catch { recoveryNeeded = true }
                 state = .off; lastIssue = error as? ConnectionIssue; detail = FriendlyError.message(error); issueMessage = detail
-                if error is HelperApprovalDenied { wantsConnection = false; recovering = false; releaseConnectionActivity() }
+                if error is HelperApprovalDenied { wantsConnection = false; recovering = false; accessLimited = false; releaseConnectionActivity() }
                 else { scheduleRecovery() }
             }
         }
@@ -212,14 +220,23 @@ import AppKit
             guard !Task.isCancelled, wantsConnection, !quitting else { return }
             guard revision == networkRevision, !sleeping, networkAvailable else { continue }
             guard let results else { lastIssue = .localEngine; issueMessage = "The network engine stopped. Reconnecting."; scheduleRecovery(); return }
-            sites = results
-            quicActive = await engine.quicStatus()
+            let currentQUIC = await engine.quicStatus()
             guard !Task.isCancelled, wantsConnection, !quitting else { return }
+            guard revision == networkRevision, !sleeping, networkAvailable, state == .on else { continue }
+            sites = results; quicActive = currentQUIC
             // A single remote endpoint failure does not prove the
             // worker or the user's established connections are dead.
-            if results.contains(where: { $0.reachable == true }) {
-                completeFailures = 0; recovering = false; issueMessage = nil; lastIssue = nil
+            if !results.isEmpty && results.allSatisfy({ $0.reachable == true }) {
+                completeFailures = 0; recovering = false; accessLimited = false
+                issueMessage = nil; lastIssue = nil
+            } else if results.contains(where: { $0.reachable == true }) {
+                // Preserve established connections during a partial outage, but
+                // never turn one successful control into an all-clear signal.
+                completeFailures = 0; recovering = false; accessLimited = true
+                lastIssue = ConnectionIssue.summarize(results)
+                issueMessage = "Some access checks failed. Retry if access is affected."
             } else {
+                accessLimited = true
                 lastIssue = ConnectionIssue.summarize(results)
                 recovering = true; issueMessage = lastIssue?.message; completeFailures += 1
                 if completeFailures >= 3 { scheduleRecovery(); return }
@@ -271,7 +288,7 @@ import AppKit
     }
     func disconnect(reason: String? = nil, completion: (() -> Void)? = nil, failure: (() -> Void)? = nil) {
         guard !quitting else { return }
-        wantsConnection = false; recovering = false
+        wantsConnection = false; recovering = false; accessLimited = false
         issueMessage = nil
         let refresh = refreshTask; refresh?.cancel()
         releaseConnectionActivity()

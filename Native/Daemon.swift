@@ -5,6 +5,7 @@ import Darwin
 // launchd starts this root service on demand. One worker at a time across clients.
 private let workerLock = NSLock()
 private var worker: Process?
+private var repairing = false
 // Keep the launchd registration for the next launch, but release the root
 // process when no XPC client or session worker still needs it.
 private var clients = 0
@@ -12,7 +13,7 @@ private func retireIfIdle() {
     DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
         workerLock.lock(); defer { workerLock.unlock() }
         guard clients == 0 else { return }
-        if worker != nil { retireIfIdle(); return }
+        if worker != nil || repairing { retireIfIdle(); return }
         exit(EXIT_SUCCESS)
     }
 }
@@ -40,7 +41,17 @@ private final class Endpoint: NSObject, PFControl {
     }
     private func run(_ args: [String], wait: Bool, reply: @escaping (String) -> Void) {
         workerLock.lock(); defer { workerLock.unlock() }
-        guard worker == nil else { reply("A network worker is already running."); return }
+        // A failed automatic repair keeps the dead worker as a fence against
+        // Connect, but an explicit repair must still be able to retry it.
+        guard !repairing, worker == nil || (wait && worker?.isRunning == false) else { reply("A network worker is already running."); return }
+        if wait {
+            do {
+                let result = try BoundedCommand.run(PFService.root+"/moledpi-pf",args,timeout:45)
+                if result.0 == 0 { worker = nil }
+                reply(result.0 == 0 ? "" : "Network recovery failed.")
+            } catch { reply("Network recovery failed.") }
+            return
+        }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: PFService.root + "/moledpi-pf")
         process.arguments = args
@@ -50,24 +61,24 @@ private final class Endpoint: NSObject, PFControl {
         process.standardError = FileHandle.nullDevice
         do {
             if !wait {
-                process.terminationHandler = { _ in
+                process.terminationHandler = { [weak process] _ in
+                    guard let process else { return }
+                    workerLock.lock()
+                    guard worker === process, !repairing else { workerLock.unlock(); return }
                     let status = URL(fileURLWithPath:"/var/run/moledpi/"+args[2]+"/status.json")
                     if let data = try? Data(contentsOf:status), let state = try? JSONSerialization.jsonObject(with:data) as? [String:Any],
                        ["stopped","failed"].contains(state["phase"] as? String ?? ""), state["pfToken"] == nil {
-                        workerLock.lock(); worker = nil; workerLock.unlock(); retireIfIdle(); return
+                        worker = nil; workerLock.unlock(); retireIfIdle(); return
                     }
-                    let repair = Process()
-                    repair.executableURL = URL(fileURLWithPath:PFService.root+"/moledpi-pf")
-                    repair.arguments = ["--repair",String(self.uid),args[2]]
-                    repair.standardInput = FileHandle.nullDevice; repair.standardOutput = FileHandle.nullDevice; repair.standardError = FileHandle.nullDevice
-                    do { try repair.run(); repair.waitUntilExit() } catch { return }
-                    guard repair.terminationStatus == 0 else { return }
-                    workerLock.lock(); worker = nil; workerLock.unlock(); retireIfIdle()
+                    repairing = true; workerLock.unlock()
+                    let result = try? BoundedCommand.run(PFService.root+"/moledpi-pf",["--repair",String(self.uid),args[2]],timeout:45)
+                    workerLock.lock(); repairing = false
+                    if result?.0 == 0 { worker = nil }
+                    workerLock.unlock(); retireIfIdle()
                 }
             }
             try process.run(); worker = process
-            if wait { process.waitUntilExit(); worker = nil }
-            reply(wait && process.terminationStatus != 0 ? "Network recovery failed." : "")
+            reply("")
         } catch { reply("Could not start the installed network worker.") }
     }
 }

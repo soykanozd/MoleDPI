@@ -113,7 +113,7 @@ enum NetworkVerification {
     }
     @MainActor static func run(encryptedDNS: Bool = false, fallback: Bool = false, endurance: Bool = false) async -> Int32 {
         let engine = PFConnection(requireDNSRecovery: encryptedDNS)
-        let targets = ["example.com", "discord.com", "www.roblox.com"].map { SiteCheck(host: $0, name: $0) }
+        let targets = Model(engine: engine, monitorNetwork: false).sites
         do {
             let config = try Data(contentsOf: URL(fileURLWithPath: "/etc/pf.conf"))
             let proxy = SCDynamicStoreCopyProxies(nil) as NSDictionary?

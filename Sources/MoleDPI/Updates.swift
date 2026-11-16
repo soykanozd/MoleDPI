@@ -23,11 +23,27 @@ struct ReleaseVersion: Comparable, Equatable {
     @Published private(set) var releaseURL: URL?
     private var task: Task<Void,Never>?
     static func safeURL(_ value: String) -> URL? {
+        let prefix = "https://github.com/soykanozd/MoleDPI/releases/tag/"
         guard let url = URL(string:value), url.scheme == "https", url.host == "github.com",
               url.user == nil, url.password == nil, url.port == nil,
               url.path.hasPrefix("/soykanozd/MoleDPI/releases/tag/"),
-              url.query == nil, url.fragment == nil else { return nil }
+              url.query == nil, url.fragment == nil, value.hasPrefix(prefix),
+              ReleaseVersion(String(value.dropFirst(prefix.count))) != nil,
+              url.absoluteString == value else { return nil }
         return url
+    }
+    static func newest(in releases:[[String:Any]], current:ReleaseVersion) -> URL? {
+        let candidates = releases.compactMap { entry -> (ReleaseVersion,URL)? in
+            guard entry["draft"] as? Bool == false,
+                  let prerelease = entry["prerelease"] as? Bool, current.beta || !prerelease,
+                  let tag = entry["tag_name"] as? String, let version = ReleaseVersion(tag),
+                  current.beta || !version.beta,
+                  let raw = entry["html_url"] as? String, let url = Self.safeURL(raw),
+                  url.lastPathComponent == tag else { return nil }
+            return (version,url)
+        }
+        guard let newest = candidates.max(by:{$0.0 < $1.0}), newest.0 > current else { return nil }
+        return newest.1
     }
     func check() {
         guard !checking else { return }
@@ -49,16 +65,10 @@ struct ReleaseVersion: Comparable, Equatable {
                     throw URLError(.badServerResponse)
                 }
                 let tag = Bundle.main.object(forInfoDictionaryKey:"MoleReleaseTag") as? String ??
-                    ((Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "0.9.3")+"-beta")
+                    (Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "0.0.0")
                 guard let current = ReleaseVersion(tag) else { throw URLError(.cannotParseResponse) }
-                let candidates = releases.compactMap { entry -> (ReleaseVersion,URL)? in
-                    guard entry["draft"] as? Bool == false, let tag = entry["tag_name"] as? String,
-                          let version = ReleaseVersion(tag), let raw = entry["html_url"] as? String,
-                          let url = Self.safeURL(raw) else { return nil }
-                    return (version,url)
-                }
-                if let newest = candidates.max(by: { $0.0 < $1.0 }), newest.0 > current {
-                    releaseURL = newest.1; message = "An update is available."
+                if let newest = Self.newest(in:releases,current:current) {
+                    releaseURL = newest; message = "An update is available."
                 } else { message = "You're up to date." }
             } catch {
                 if !Task.isCancelled { message = "Could not check for updates. Try again later." }

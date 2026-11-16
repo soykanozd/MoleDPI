@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import Foundation
+import Darwin
 
 // Cancellation acts on this Process object only. Locking covers the interval
 // between checking for cancellation and actually spawning the child.
@@ -26,6 +27,13 @@ final class OwnedCommand: @unchecked Sendable {
     private func cancel() {
         lock.lock(); defer { lock.unlock() }
         cancelled = true
-        if process.isRunning { process.terminate() }
+        if process.isRunning {
+            process.terminate()
+            DispatchQueue.global().asyncAfter(deadline:.now()+2) { [weak self] in
+                guard let self else { return }
+                self.lock.lock(); defer { self.lock.unlock() }
+                if self.cancelled && self.process.isRunning { kill(self.process.processIdentifier,SIGKILL) }
+            }
+        }
     }
 }

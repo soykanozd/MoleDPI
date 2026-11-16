@@ -1,4 +1,4 @@
-# UDP / QUIC scope — v1.2.0
+# UDP / QUIC scope — v1.2.1
 
 ## What the app does
 
@@ -23,6 +23,8 @@ See [the release verification report](../RELEASE-TESTS.md) for actual counts, ti
 - No general UDP/voice/game bypass promise. Forwarding and ordinary access do not prove censorship bypass.
 - Independent security review and Apple notarization remain pending.
 
-Connected means the configured HTTPS checks and local engine/session verification passed. It does not mean every UDP/QUIC destination was tested. If the QUIC backend cannot start or exits, safe verified cleanup preserves working TCP and the panel identifies TCP fallback. Failed cleanup stops the session.
+Connected means the configured HTTPS page and API/CDN TLS transport checks and local engine/session verification passed. It does not mean every UDP/QUIC destination was tested. If the QUIC backend cannot start or exits, safe verified cleanup preserves working TCP and the panel identifies TCP fallback. Failed cleanup stops the session.
 
 Quit before an advanced TCP-only launch: `open -a MoleDPI --args --tcp-only`. No arbitrary destinations, helper executables or PF rules can be supplied by these flags. Root helper hashes, peer authentication and restoration checks are unchanged.
+
+The UDP mapping idle timeout is 60 seconds. This avoids the prior 2-second expiry; it is not a guarantee for long-running games or every remote UDP service. Partial HTTPS failures are shown as Limited Access while healthy established connections remain active.
